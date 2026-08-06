@@ -26,7 +26,7 @@ export class PaletteService {
 
   async listPalettes(params: PaletteListParams): Promise<{
     items: Palette[];
-    meta: { page: number; perPage: number; total: number; pages: number };
+    meta: { page: number; perPage: number; totalItems: number; totalPages: number };
   }> {
     const skip = (params.page - 1) * params.perPage;
     const [items, total] = await Promise.all([
@@ -44,8 +44,8 @@ export class PaletteService {
       meta: {
         page: params.page,
         perPage: params.perPage,
-        total,
-        pages: Math.ceil(total / params.perPage),
+        totalItems: total,
+        totalPages: Math.ceil(total / params.perPage),
       },
     };
   }

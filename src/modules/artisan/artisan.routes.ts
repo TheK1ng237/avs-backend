@@ -18,6 +18,7 @@ const controller = new ArtisanController(service);
  * /api/v1/artisans:
  *   get:
  *     summary: List all artisans
+ *     tags: [Artisans]
  *     parameters:
  *       - in: query
  *         name: page
@@ -42,6 +43,7 @@ router.get('/', publicApiRateLimiter, controller.list);
  * /api/v1/artisans/{id}:
  *   get:
  *     summary: Get artisan by ID
+ *     tags: [Artisans]
  *     parameters:
  *       - in: path
  *         name: id
@@ -60,6 +62,7 @@ router.get('/:id', publicApiRateLimiter, controller.getById);
  * /api/v1/artisans:
  *   post:
  *     summary: Create artisan profile
+ *     tags: [Artisans]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -97,6 +100,7 @@ router.post('/', authenticate, controller.create);
  * /api/v1/artisans/{id}:
  *   patch:
  *     summary: Update artisan profile
+ *     tags: [Artisans]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -123,6 +127,7 @@ router.patch('/:id', authenticate, controller.update);
  * /api/v1/artisans/{id}/verify:
  *   patch:
  *     summary: Verify artisan
+ *     tags: [Artisans]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -143,6 +148,7 @@ router.patch('/:id/verify', authenticate, requireAdmin, controller.verify);
  * /api/v1/artisans/{id}:
  *   delete:
  *     summary: Delete artisan
+ *     tags: [Artisans]
  *     security:
  *       - bearerAuth: []
  *     parameters:

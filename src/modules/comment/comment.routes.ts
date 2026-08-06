@@ -18,6 +18,7 @@ const controller = new CommentController(service);
  * /api/v1/patterns/{patternId}/comments:
  *   get:
  *     summary: Get comments on a pattern
+ *     tags: [Comments]
  *     parameters:
  *       - in: path
  *         name: patternId
@@ -40,6 +41,7 @@ router.get('/patterns/:patternId/comments', publicApiRateLimiter, controller.get
  * /api/v1/artisans/{artisanId}/comments:
  *   get:
  *     summary: Get comments on an artisan
+ *     tags: [Comments]
  *     parameters:
  *       - in: path
  *         name: artisanId
@@ -59,6 +61,7 @@ router.get('/artisans/:artisanId/comments', publicApiRateLimiter, controller.get
  * /api/v1/patterns/{patternId}/comments:
  *   post:
  *     summary: Add comment to a pattern
+ *     tags: [Comments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -93,6 +96,7 @@ router.post('/patterns/:patternId/comments', authenticate, publicApiRateLimiter,
  * /api/v1/artisans/{artisanId}/comments:
  *   post:
  *     summary: Add comment to an artisan
+ *     tags: [Comments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -118,6 +122,7 @@ router.post('/artisans/:artisanId/comments', authenticate, publicApiRateLimiter,
  * /api/v1/comments/{id}:
  *   delete:
  *     summary: Delete a comment
+ *     tags: [Comments]
  *     security:
  *       - bearerAuth: []
  *     parameters:

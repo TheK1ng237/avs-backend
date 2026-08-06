@@ -2,6 +2,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import type { RequestHandler } from 'express';
+import 'dotenv/config'
 
 // ── Helmet — Headers HTTP de sécurité ─────────────────────────────────────────
 export const helmetMiddleware = helmet({
@@ -30,14 +31,18 @@ const ALLOWED = (process.env.ALLOWED_ORIGINS ?? 'http://localhost:3000').split('
 
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
-    // Autorise les requêtes sans origine (Postman, mobile) en dev uniquement
-    if (!origin && process.env.NODE_ENV !== 'production') {
+    // En développement, autoriser les requêtes sans origine (Postman, curl, etc.)
+    if (!origin) {
+      if (process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+      return callback(new Error('CORS: Origine requise en production'));
+    }
+    // Vérifier si l'origine est dans la liste blanche
+    if (ALLOWED.includes(origin)) {
       return callback(null, true);
     }
-    if (origin && ALLOWED.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error(`CORS: Origine non autorisée — ${origin ?? 'unknown'}`));
+    callback(new Error(`CORS: Origine non autorisée — ${origin}`));
   },
   credentials:      true,
   methods:          ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

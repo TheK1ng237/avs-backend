@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { PrismaClient, User } from '@prisma/client';
+import { ConflictError } from '@/shared/errors/AppError';
 
 export class PrismaUserRepository {
   constructor(private readonly db: PrismaClient) {}
@@ -21,7 +22,15 @@ export class PrismaUserRepository {
   }
 
   async create(data: Prisma.UserCreateInput): Promise<User> {
-    return this.db.user.create({ data });
+    try {
+      return this.db.user.create({ data });
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        // Unique constraint violation
+        throw new ConflictError('Cette adresse email est déjà utilisée');
+      }
+      throw error;
+    }
   }
 
   async update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
@@ -33,20 +42,20 @@ export class PrismaUserRepository {
   }
 
   async countPatterns(userId: string): Promise<number> {
-    return this.db.pattern.count({ where: { createdById: userId } });
+    // Pattern model doesn't have createdById relationship yet
+    // Returning 0 as placeholder
+    return 0;
   }
 
   async countDownloads(userId: string): Promise<number> {
-    return this.db.pattern.aggregate({
-      where: { createdById: userId },
-      _sum: { downloadCount: true },
-    }).then(r => r._sum?.downloadCount ?? 0);
+    // Pattern model doesn't have createdById relationship yet
+    // Returning 0 as placeholder
+    return 0;
   }
 
   async countViews(userId: string): Promise<number> {
-    return this.db.pattern.aggregate({
-      where: { createdById: userId },
-      _sum: { viewCount: true },
-    }).then(r => r._sum?.viewCount ?? 0);
+    // Pattern model doesn't have createdById relationship yet
+    // Returning 0 as placeholder
+    return 0;
   }
 }

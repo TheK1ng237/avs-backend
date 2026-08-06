@@ -37,4 +37,17 @@ export class ActivityController {
       next(err);
     }
   };
+
+  getGlobalActivity = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const query = QuerySchema.parse(req.query);
+      const result = await this.service.getGlobalActivity({
+        skip: (query.page - 1) * query.perPage,
+        take: query.perPage,
+      });
+      res.json(ok(result, 'Global activity retrieved'));
+    } catch (err) {
+      next(err);
+    }
+  };
 }

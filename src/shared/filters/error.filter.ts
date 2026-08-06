@@ -1,6 +1,6 @@
 import type { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { AppError, ValidationError } from '../errors/AppError';
+import { AppError } from '../errors/AppError';
 import { logger } from '../utils/logger';
 import { StatusCodes } from 'http-status-codes';
 
@@ -8,14 +8,12 @@ import { StatusCodes } from 'http-status-codes';
 export const errorFilter: ErrorRequestHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
   const requestId = req.headers['x-request-id'] as string | undefined;
 
-  // Zod → ValidationError
   if (err instanceof ZodError) {
-    const validationErr = new ValidationError(err.flatten().fieldErrors);
-    return res.status(validationErr.statusCode).json({
+    return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ // Tu peux aussi utiliser validationErr.statusCode directement si tu l'as corrigé avant
       success: false,
-      message: validationErr.message,
-      code:    validationErr.code,
-      details: validationErr.details,
+      message: 'Données invalides',
+      code:    'VALIDATION_ERROR',
+      details: err.flatten().fieldErrors,
       requestId,
     });
   }
@@ -43,7 +41,8 @@ export const errorFilter: ErrorRequestHandler = (err: unknown, req: Request, res
 
   // Erreur inconnue
   logger.error('[UnhandledError]', { err, requestId });
-  res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+  
+  return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
     success: false,
     message: process.env.NODE_ENV === 'production' ? 'Erreur serveur interne' : String(err),
     code: 'INTERNAL_ERROR',

@@ -108,6 +108,30 @@ router.post('/login', controller.login);
  *       200:
  *         description: Logout successful
  */
+router.post('/github', controller.githubLogin);
+
+/**
+ * @swagger
+ * /api/v1/auth/google:
+ *   post:
+ *     summary: Login with Google
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [accessToken]
+ *             properties:
+ *               accessToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Google login successful
+ */
+router.post('/google', controller.googleLogin);
+
 router.post('/logout', controller.logout);
 
 /**

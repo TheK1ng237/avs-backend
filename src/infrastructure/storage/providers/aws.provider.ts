@@ -1,6 +1,7 @@
 import { S3 } from '@aws-sdk/client-s3';
 import { IStorageProvider } from '../storage.interface';
 import { v4 as uuid } from 'uuid';
+import 'dotenv/config'
 
 export class AwsProvider implements IStorageProvider {
   private s3 = new S3({
@@ -37,5 +38,26 @@ export class AwsProvider implements IStorageProvider {
       Bucket: this.bucket,
       Key: key,
     });
+  }
+
+  async download(key: string): Promise<Buffer> {
+    const response = await this.s3.getObject({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    
+    if (!response.Body) {
+      throw new Error('No data returned from S3');
+    }
+
+    // Convert the stream to Buffer
+    const chunks: Uint8Array[] = [];
+    const stream = response.Body as any;
+    
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+
+    return Buffer.concat(chunks);
   }
 }

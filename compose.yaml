@@ -1,0 +1,51 @@
+services:
+  api-db:
+    image: postgres:16-alpine
+    container_name: buni-api-db-prod
+    environment:
+      - POSTGRES_USER=${PROD_DB_USER}
+      - POSTGRES_PASSWORD=${PROD_DB_PASSWORD}
+      - POSTGRES_DB=${PROD_DB_NAME}
+    volumes:
+      - buni-db-prod-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PROD_DB_USER} -d ${PROD_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # 💡 Pas de 'target: builder' ici. On laisse Docker aller jusqu'à la dernière étape (stage-1)
+    container_name: buni-api-prod
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - DATABASE_URL=postgresql://${PROD_DB_USER}:${PROD_DB_PASSWORD}@api-db:5432/${PROD_DB_NAME}?schema=public
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      api-db:
+        condition: service_healthy
+
+volumes:
+  buni-db-prod-data:

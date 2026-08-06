@@ -32,7 +32,7 @@ export class ArtisanService {
 
   async listArtisans(params: ArtisanListParams): Promise<{
     items: Artisan[];
-    meta: { page: number; perPage: number; total: number; pages: number };
+    meta: { page: number; perPage: number; totalPages: number; totalItems: number };
   }> {
     const skip = (params.page - 1) * params.perPage;
     const [items, total] = await Promise.all([
@@ -53,8 +53,8 @@ export class ArtisanService {
       meta: {
         page: params.page,
         perPage: params.perPage,
-        total,
-        pages: Math.ceil(total / params.perPage),
+        totalItems: total,
+        totalPages: Math.ceil(total / params.perPage),
       },
     };
   }

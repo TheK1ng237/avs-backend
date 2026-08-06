@@ -34,7 +34,7 @@ export class CommentService {
     params?: { page?: number; perPage?: number }
   ): Promise<{
     items: Comment[];
-    meta: { total: number; page: number; pages: number };
+    meta: { totalItems: number; page: number; totalPages: number; perPage: number };
   }> {
     const page = params?.page ?? 1;
     const perPage = params?.perPage ?? 20;
@@ -51,9 +51,10 @@ export class CommentService {
     return {
       items,
       meta: {
-        total,
+        totalItems: total,
         page,
-        pages: Math.ceil(total / perPage),
+        perPage,
+        totalPages: Math.ceil(total / perPage),
       },
     };
   }

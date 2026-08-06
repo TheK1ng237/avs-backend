@@ -1,0 +1,41 @@
+services:
+  api-db:
+    image: postgres:16-alpine
+    container_name: buni-api-db-dev
+    environment:
+      - POSTGRES_USER=buni_user
+      - POSTGRES_PASSWORD=buni_password
+      - POSTGRES_DB=buni_backend_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - buni-db-dev-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buni_user -d buni_backend_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder # 💡 Force Docker à s'arrêter à l'étape 'builder' où toutes les devDependencies (tsx) sont présentes
+    container_name: buni-api-dev
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - DATABASE_URL=postgresql://buni_user:buni_password@api-db:5432/buni_backend_dev?schema=public
+    volumes:
+      - .:/build # 💡 Modifié /app en /build pour correspondre au WORKDIR de l'étape builder détecté dans tes logs
+      - /build/node_modules # 💡 Protège les packages installés dans le conteneur pour éviter l'erreur "tsx not found"
+    command: npm run dev 
+    depends_on:
+      api-db:
+        condition: service_healthy
+
+volumes:
+  buni-db-dev-data:

@@ -57,7 +57,7 @@ export class CommentController {
     }
   };
 
-  deleteComment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  deleteComment = async (req: Request<{id:string}>, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user?.userId;
       if (!userId) {
@@ -65,7 +65,12 @@ export class CommentController {
         return;
       }
 
-      await this.service.deleteComment(req.params['id'] ?? '', userId);
+      const commentId = req.params.id ;
+      if (!commentId) {
+        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Comment ID is required' });
+        return;
+      }
+      await this.service.deleteComment(commentId, userId);
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);

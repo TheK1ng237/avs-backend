@@ -38,9 +38,10 @@ export class PaletteController {
     }
   };
 
-  getById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getById = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const palette = await this.service.getPaletteById(req.params['id'] ?? '');
+      const id = req.params.id;
+      const palette = await this.service.getPaletteById(id);
       res.json(ok(palette, 'Palette retrieved'));
     } catch (err) {
       next(err);
@@ -57,28 +58,31 @@ export class PaletteController {
     }
   };
 
-  update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  update = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const id = req.params.id;
       const data = CreateSchema.partial().parse(req.body);
-      const palette = await this.service.updatePalette(req.params['id'] ?? '', data);
+      const palette = await this.service.updatePalette(id, data);
       res.json(ok(palette, 'Palette updated'));
     } catch (err) {
       next(err);
     }
   };
 
-  publish = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  publish = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const palette = await this.service.publishPalette(req.params['id'] ?? '');
+      const id = req.params.id;
+      const palette = await this.service.publishPalette(id);
       res.json(ok(palette, 'Palette published'));
     } catch (err) {
       next(err);
     }
   };
 
-  delete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  delete = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await this.service.deletePalette(req.params['id'] ?? '');
+      const id = req.params.id;
+      await this.service.deletePalette(id);
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);

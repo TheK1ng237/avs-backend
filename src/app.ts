@@ -20,12 +20,11 @@ import authRoutes from '@/modules/auth/auth.routes';
 import userRoutes from '@/modules/user/user.routes';
 
 // ── Cultural Content ───────────────────────────────────────────────────────
-import cultureRoutes from '@/api/routes/culture.routes';
+import cultureRoutes from '@/modules/culture/culture.routes';
 import artisanRoutes from '@/modules/artisan/artisan.routes';
 
 // ── Creative Tools & Resources ─────────────────────────────────────────────
 import paletteRoutes from '@/modules/palette/palette.routes';
-import templateRoutes from '@/modules/template/template.routes';
 
 // ── Community & Interaction ───────────────────────────────────────────────
 import commentRoutes from '@/modules/comment/comment.routes';
@@ -128,7 +127,6 @@ app.use(`/api/${API_VERSION}/artisans`, artisanRoutes);
 
 // Creative Tools & Resources
 app.use(`/api/${API_VERSION}/palettes`, paletteRoutes);
-app.use(`/api/${API_VERSION}/templates`, templateRoutes);
 
 // Community & Interaction
 app.use(`/api/${API_VERSION}/comments`, commentRoutes);

@@ -1,0 +1,15 @@
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN     "allowIndexing" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "emailComments" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "emailDownloads" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "emailNewsletter" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "emailValidations" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "google" TEXT,
+ADD COLUMN     "profilePublic" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "pushBrowser" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "pushValidations" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "shareAnalytics" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "showEmail" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "showLocation" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "twoFAEnabled" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "twoFASecret" TEXT;

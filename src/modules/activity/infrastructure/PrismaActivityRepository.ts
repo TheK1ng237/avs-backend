@@ -35,7 +35,7 @@ export class PrismaActivityRepository {
       this.db.user.count(),
       this.db.artisan.count(),
       this.db.pattern.aggregate({
-        _sum: { downloadCount: true },
+        _sum: { downloads: true },
       }),
     ]);
 
@@ -43,7 +43,24 @@ export class PrismaActivityRepository {
       totalPatterns,
       totalUsers,
       totalArtisans,
-      totalDownloads: stats._sum?.downloadCount ?? 0,
+      totalDownloads: stats._sum?.downloads ?? 0,
     };
+  }
+
+  async findGlobal(params?: { skip?: number; take?: number }): Promise<Activity[]> {
+    return this.db.activity.findMany({
+      skip: params?.skip,
+      take: params?.take ?? 20,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
   }
 }

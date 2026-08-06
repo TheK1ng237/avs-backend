@@ -18,6 +18,7 @@ const controller = new ActivityController(service);
  * /api/v1/activities:
  *   get:
  *     summary: Get user activity feed
+ *     tags: [Activities]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -37,13 +38,25 @@ router.get('/', authenticate, controller.getUserActivity);
 
 /**
  * @swagger
- * /api/v1/stats/global:
+ * /api/v1/activities/global:
  *   get:
- *     summary: Get global platform statistics
+ *     summary: Get global platform activity
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: perPage
+ *         schema: { type: integer, default: 20, maximum: 100 }
  *     responses:
  *       200:
- *         description: Global statistics
+ *         description: Global activity feed
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
-router.get('/global', publicApiRateLimiter, controller.getGlobalStats);
+router.get('/global', authenticate, controller.getGlobalActivity);
 
 export default router;

@@ -18,6 +18,7 @@ const controller = new PaletteController(service);
  * /api/v1/palettes:
  *   get:
  *     summary: List all published palettes
+ *     tags: [Palettes]
  *     parameters:
  *       - in: query
  *         name: page
@@ -36,6 +37,7 @@ router.get('/', publicApiRateLimiter, controller.list);
  * /api/v1/palettes/{id}:
  *   get:
  *     summary: Get palette by ID
+ *     tags: [Palettes]
  *     parameters:
  *       - in: path
  *         name: id
@@ -54,6 +56,7 @@ router.get('/:id', publicApiRateLimiter, controller.getById);
  * /api/v1/palettes:
  *   post:
  *     summary: Create new palette
+ *     tags: [Palettes]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -89,6 +92,7 @@ router.post('/', authenticate, controller.create);
  * /api/v1/palettes/{id}:
  *   patch:
  *     summary: Update palette
+ *     tags: [Palettes]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -115,6 +119,7 @@ router.patch('/:id', authenticate, controller.update);
  * /api/v1/palettes/{id}/publish:
  *   patch:
  *     summary: Publish palette
+ *     tags: [Palettes]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -135,6 +140,7 @@ router.patch('/:id/publish', authenticate, requireAdmin, controller.publish);
  * /api/v1/palettes/{id}:
  *   delete:
  *     summary: Delete palette
+ *     tags: [Palettes]
  *     security:
  *       - bearerAuth: []
  *     parameters:

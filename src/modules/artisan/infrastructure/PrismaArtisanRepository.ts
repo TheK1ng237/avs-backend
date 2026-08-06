@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
-import { PrismaClient, Artisan } from '@prisma/client';
+// 1. Ajoute ArtisanSpecialty dans les imports
+import { PrismaClient, Artisan, ArtisanSpecialty } from '@prisma/client';
 
 export class PrismaArtisanRepository {
   constructor(private readonly db: PrismaClient) {}
@@ -16,11 +17,12 @@ export class PrismaArtisanRepository {
     });
   }
 
+  // 2. Modifie le type de specialty ici : ArtisanSpecialty au lieu de string
   async findFiltered(params: {
     skip?: number;
     take?: number;
     search?: string;
-    specialty?: string;
+    specialty?: ArtisanSpecialty; 
   }): Promise<Artisan[]> {
     return this.db.artisan.findMany({
       skip: params.skip,
@@ -41,7 +43,8 @@ export class PrismaArtisanRepository {
     });
   }
 
-  async countFiltered(params: { search?: string; specialty?: string }): Promise<number> {
+  // 3. Fais la même modification ici
+  async countFiltered(params: { search?: string; specialty?: ArtisanSpecialty }): Promise<number> {
     return this.db.artisan.count({
       where: {
         ...(params.search && {

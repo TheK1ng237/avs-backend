@@ -33,9 +33,16 @@ export class ArtisanController {
     }
   };
 
-  getById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getById = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const artisan = await this.service.getArtisanById(req.params['id'] ?? '');
+
+      const id=req.params.id;
+      if (!id) {
+        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Artisan ID is required' });
+        return;
+      }
+      
+      const artisan = await this.service.getArtisanById(id);
       res.json(ok(artisan, 'Artisan retrieved'));
     } catch (err) {
       next(err);
@@ -58,28 +65,43 @@ export class ArtisanController {
     }
   };
 
-  update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  update = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
       const data = CreateSchema.partial().parse(req.body);
-      const artisan = await this.service.updateArtisan(req.params['id'] ?? '', data);
+      const id = req.params.id;
+      if (!id) {
+        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Artisan ID is required' });
+        return;
+      }
+      const artisan = await this.service.updateArtisan(id , data);
       res.json(ok(artisan, 'Artisan updated'));
     } catch (err) {
       next(err);
     }
   };
 
-  delete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  delete = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await this.service.deleteArtisan(req.params['id'] ?? '');
+      const id = req.params.id;
+      if (!id) {
+        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Artisan ID is required' });
+        return;
+      }
+      await this.service.deleteArtisan(id);
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);
     }
   };
 
-  verify = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  verify = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const artisan = await this.service.verifyArtisan(req.params['id'] ?? '');
+      const id = req.params.id;
+      if (!id) {
+        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Artisan ID is required' });
+        return;
+      }
+      const artisan = await this.service.verifyArtisan(id);
       res.json(ok(artisan, 'Artisan verified'));
     } catch (err) {
       next(err);

@@ -1,5 +1,0 @@
-{"level":"info","message":"✔ Base de données connectée","timestamp":"2026-03-28T15:23:50.536Z"}
-{"level":"info","message":"🚀 AVS Backend démarré — http://localhost:4000","timestamp":"2026-03-28T15:23:50.555Z"}
-{"level":"info","message":"📚 Swagger UI : http://localhost:4000/api-docs","timestamp":"2026-03-28T15:23:50.555Z"}
-{"level":"info","message":"📋 Health     : http://localhost:4000/api/v1/health","timestamp":"2026-03-28T15:23:50.556Z"}
-{"level":"info","message":"🌍 Environnement : production","timestamp":"2026-03-28T15:23:50.556Z"}

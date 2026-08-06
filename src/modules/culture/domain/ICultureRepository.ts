@@ -6,12 +6,12 @@
 // interface côté Java. La couche Application (Service) n'a pas besoin de changer.
 // =============================================================================
 
-import type { CulturePattern, PatternType, Region } from './CulturePattern';
+import type { CulturePattern, PatternType, Origin } from './CulturePattern';
 
 export interface FindPatternsOptions {
   page?:         number;
   perPage?:      number;
-  region?:       Region;
+  region?:       Origin;
   patternType?:  PatternType;
   search?:       string;
   onlyPublished?:boolean;
