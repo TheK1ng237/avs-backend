@@ -62,4 +62,9 @@ export class FirebaseProvider implements IStorageProvider {
   async delete(key: string) {
     await this.bucket!.file(key).delete();
   }
+
+  async download(key: string) {
+    const [content] = await this.bucket!.file(key).download();
+    return content;
+  }
 }
