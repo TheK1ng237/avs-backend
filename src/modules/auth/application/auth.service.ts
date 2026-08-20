@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { db } from '@/config/database';
 import { PrismaUserRepository } from '@/modules/user/infrastructure/PrismaUserRepository';
 import { UnauthorizedError, ConflictError } from '@/shared/errors/AppError';
 import type { User, Role } from '@prisma/client';
@@ -246,6 +247,17 @@ export class AuthService {
       this.jwtSecret,
       { expiresIn: this.refreshExpiry }
     );
+
+    // Record session entry in database
+    db.session.create({
+      data: {
+        userId: user.id,
+        sessionToken: refreshToken,
+        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    }).catch(() => {
+      // Ignore background session record errors
+    });
 
     return {
       user: safeUser,

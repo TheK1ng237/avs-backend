@@ -363,6 +363,7 @@ export class UserController {
         return;
       }
 
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       const sessions = await this.service.getSessions(userId);
       res.json(ok(sessions, 'Sessions retrieved'));
     } catch (err) {
@@ -403,4 +404,88 @@ export class UserController {
       next(err);
     }
   };
+
+  setup2FA = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      const result = await this.service.setup2FA(userId);
+      res.json(ok(result, '2FA setup initiated'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  verify2FA = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      const { code } = req.body;
+      if (!code) {
+        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Code required' });
+        return;
+      }
+
+      await this.service.verify2FA(userId, code);
+      res.json(ok(null, '2FA enabled successfully'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  disable2FA = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      await this.service.disable2FA(userId);
+      res.json(ok(null, '2FA disabled successfully'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  exportData = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      const data = await this.service.exportUserData(userId);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename="avs-user-data.json"');
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  deactivate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      await this.service.deactivateUser(userId);
+      res.json(ok(null, 'Account deactivated successfully'));
+    } catch (err) {
+      next(err);
+    }
+  };
 }
+

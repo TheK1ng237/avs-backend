@@ -21,7 +21,9 @@ declare module 'express-serve-static-core' {
  */
 export const authenticate: RequestHandler = (req, _res, next) => {
   try {
-    const token = req.cookies?.avs_access;
+    const authHeader = req.headers.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const token = req.cookies?.avs_access || req.cookies?.avs_session || bearerToken;
 
     if (!token) {
       throw new UnauthorizedError('Token manquant');
@@ -45,10 +47,12 @@ export const authenticate: RequestHandler = (req, _res, next) => {
 };
 
 // ── Guard par rôle ────────────────────────────────────────────────────────────
-export const requireRole = (...roles: JwtPayload['role'][]): RequestHandler =>
+export const requireRole = (...roles: (JwtPayload['role'] | string)[]): RequestHandler =>
   (req, _res, next) => {
     if (!req.user) { return next(new UnauthorizedError()); }
-    if (!roles.includes(req.user.role)) {
+    const userRole = String(req.user.role || '').toLowerCase();
+    const allowedRoles = roles.map((r) => String(r).toLowerCase());
+    if (!allowedRoles.includes(userRole)) {
       return next(new ForbiddenError(`Rôle requis : ${roles.join(' ou ')}`));
     }
     next();
