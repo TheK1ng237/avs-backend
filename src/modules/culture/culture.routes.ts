@@ -134,6 +134,7 @@ router.get('/recent/global', authenticate, controller.getRecentGlobal);
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
+router.get('/:slug/share', publicApiRateLimiter, controller.getShareData);
 router.get('/:slug', publicApiRateLimiter, controller.getBySlug);
 router.get('/:slug/stats', publicApiRateLimiter, controller.getStats);
 
@@ -690,6 +691,7 @@ router.delete('/:id', authenticate, requireAdmin, controller.remove);
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
+router.get('/:slug/preview', publicApiRateLimiter, controller.preview);
 router.get('/:id/download', publicApiRateLimiter, controller.download);
 router.post('/:id/view', publicApiRateLimiter, controller.trackView);
 

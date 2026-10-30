@@ -275,6 +275,28 @@ export class CultureController {
     }
   };
 
+  getShareData = async (
+    req: Request<{ slug: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const pattern = await db.pattern.findUnique({
+        where: { slug: req.params.slug },
+        include: { origin: true, colors: true, symbols: true, artisanQuote: true, symbolism: true },
+      });
+
+      if (!pattern || pattern.status !== 'PUBLISHED') {
+        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        return;
+      }
+
+      res.json(ok(PatternListResponseMapper.toPatternDoc(pattern)));
+    } catch (err) {
+      next(err);
+    }
+  };
+
   create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       
@@ -623,6 +645,69 @@ export class CultureController {
     try {
       await this.service.deletePattern(req.params.id, req.user!.role);
       res.status(StatusCodes.NO_CONTENT).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  preview = async (
+    req: Request<{ slug: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      if (isStaticPatternSlug(req.params.slug)) {
+        const staticPattern = STATIC_PATTERN_EXPORTS[req.params.slug];
+        const svgContent = generateVectorSvgFromCss({
+          id: req.params.slug,
+          name: staticPattern.name,
+          slug: req.params.slug,
+          type: staticPattern.type,
+          cssClass: staticPattern.type.toLowerCase(),
+          colors: staticPattern.colors.map((hex) => ({ hex })),
+        });
+
+        res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+        res.send(svgContent);
+        return;
+      }
+
+      const pattern = await db.pattern.findUnique({
+        where: { slug: req.params.slug },
+        include: { colors: true },
+      });
+
+      if (!pattern || pattern.status !== 'PUBLISHED') {
+        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        return;
+      }
+
+      let svgContent = pattern.svgContent || '';
+      if (!svgContent && pattern.imgUrl?.includes('/patterns/')) {
+        const urlParts = pattern.imgUrl.split('/patterns/');
+        if (urlParts[1]) {
+          const fileBuffer = await this.storage.download(urlParts[1]);
+          svgContent = fileBuffer.toString('utf-8');
+        }
+      }
+
+      if (!svgContent) {
+        svgContent = generateVectorSvgFromCss({
+          id: pattern.id,
+          name: pattern.name || 'Motif AVS',
+          slug: pattern.slug,
+          type: pattern.type,
+          format: pattern.format,
+          cssClass: pattern.cssClass,
+          cssCode: pattern.cssCode,
+          colors: pattern.colors,
+        });
+      }
+
+      res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+      res.send(svgContent);
     } catch (err) {
       next(err);
     }
