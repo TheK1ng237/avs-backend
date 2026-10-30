@@ -37,7 +37,9 @@ export interface CreatePatternDto {
   origin?:    any;
   artisanQuote?: any;
   symbolUsage?: string;
-  svgPattern?: string;
+  format?: 'SVG' | 'CSS' | 'HYBRID';
+  cssCode?: string | null;
+  svgContent?: string | null;
 }
 
 export interface UpdatePatternDto extends Partial<CreatePatternDto> {}
@@ -93,7 +95,10 @@ export class CultureService {
       nameLocal:   dto.nameLocal,
       imgUrl:      dto.imgUrl ?? null,
       type:        dto.type,
+      format:      dto.format ?? (dto.imgUrl ? 'SVG' : 'CSS'),
       cssClass:    dto.cssClass,
+      cssCode:     dto.cssCode,
+      svgContent:  dto.svgContent,
       era:         dto.era ?? null,
       license:     dto.license ?? null,
       summary:     dto.summary,
@@ -241,4 +246,3 @@ export class CultureService {
       .slice(0, 64);
   }
 }
-

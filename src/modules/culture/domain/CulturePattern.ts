@@ -5,6 +5,7 @@
 // =============================================================================
 
 export type PatternType = 'KENTE' | 'BOGOLAN' | 'ADINKRA' | 'NDEBELE' | 'KUBA' | 'NDOP' | 'WAX' | 'BERBER';
+export type PatternFormat = 'SVG' | 'CSS' | 'HYBRID';
 export type Status = 'DRAFT' | 'PUBLISHED' | 'REVIEW' | 'REJECTED';
 
 // ── Interfaces des relations ───────────────────────────────────────────────────
@@ -70,10 +71,13 @@ export interface CulturePatternProps {
   createdById:string;
 
   // ── Classification ────────────────────────────────
-  type:      PatternType;
-  cssClass:  string;
-  era:       string | null;
-  license:   string | null;
+  type:       PatternType;
+  format?:    PatternFormat;
+  cssClass:   string;
+  cssCode?:   string | null;
+  svgContent?:string | null;
+  era:        string | null;
+  license:    string | null;
 
   // ── Contenu textuel ───────────────────────────────
   summary:    string;
@@ -119,7 +123,10 @@ export class CulturePattern {
     if (!props.slug.match(/^[a-z0-9-]+$/)) {
       throw new Error('Slug invalide : minuscules, chiffres et tirets uniquement');
     }
-    return new CulturePattern(props);
+    return new CulturePattern({
+      ...props,
+      format: props.format || 'CSS',
+    });
   }
 
   // ── Accesseurs (immutabilité) ──────────────────────────────────────────────
@@ -129,10 +136,13 @@ export class CulturePattern {
   get name():        string | null   { return this.props.name; }
   get nameLocal():   string          { return this.props.nameLocal; }
   get imgUrl():      string | null   { return this.props.imgUrl; }
-  get createdById(): string          {return this.props.createdById;}
+  get createdById(): string          { return this.props.createdById; }
 
   get type():        PatternType     { return this.props.type; }
+  get format():      PatternFormat   { return this.props.format || 'CSS'; }
   get cssClass():    string          { return this.props.cssClass; }
+  get cssCode():     string | null   { return this.props.cssCode ?? null; }
+  get svgContent():  string | null   { return this.props.svgContent ?? null; }
   get era():         string | null   { return this.props.era; }
   get license():     string | null   { return this.props.license; }
 

@@ -43,6 +43,8 @@ export interface PatternDoc {
   imgUrl: string;
   type: string;
   cssClass: string;
+  format: 'SVG' | 'CSS' | 'HYBRID';
+  svgUrl: string | null;
   status: string;
   isFeatured: boolean;
   origin: PatternOrigin;
@@ -71,7 +73,9 @@ export function toPatternDoc(domain: any): PatternDoc {
     nameLocal: domain.nameLocal,
     imgUrl: domain.imgUrl,
     type: domain.type,
-    cssClass: domain.cssClass,
+    cssClass: domain.type.toLowerCase(),
+    format: domain.format,
+    svgUrl: domain.format === 'SVG' || domain.format === 'HYBRID' ? domain.imgUrl : null,
     status: domain.status,
     isFeatured: domain.isFeatured,
     origin: {

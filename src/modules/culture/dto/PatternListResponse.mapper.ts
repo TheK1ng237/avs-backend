@@ -25,7 +25,9 @@ export class PatternListResponseMapper {
       nameLocal: pattern.nameLocal,
       imgUrl: pattern.imgUrl,
       type: pattern.type,
-      cssClass: pattern.cssClass,
+      cssClass: pattern.type.toLowerCase(),
+      format: pattern.format,
+      svgUrl: pattern.format === 'SVG' || pattern.format === 'HYBRID' ? pattern.imgUrl : null,
       status: pattern.status ?? '',
       isFeatured: pattern.isFeatured,
       origin: {
