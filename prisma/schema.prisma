@@ -8,42 +8,43 @@ datasource db {
 }
 
 model User {
-  id               String     @id @default(cuid())
-  email            String     @unique
-  name             String?
-  passwordHash     String?
-  role             Role       @default(VIEWER)
-  emailVerified    DateTime?
-  bio              String?
-  location         String?
-  website          String?
-  github           String?
-  twitter          String?
-  specialty        String?
-  avatar           String?
-  verified         Boolean    @default(false)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-  allowIndexing    Boolean    @default(true)
-  emailComments    Boolean    @default(true)
-  emailDownloads   Boolean    @default(false)
-  emailNewsletter  Boolean    @default(false)
-  emailValidations Boolean    @default(true)
-  google           String?
-  profilePublic    Boolean    @default(true)
-  pushBrowser      Boolean    @default(true)
-  pushValidations  Boolean    @default(true)
-  shareAnalytics   Boolean    @default(false)
-  showEmail        Boolean    @default(false)
-  showLocation     Boolean    @default(true)
-  twoFAEnabled     Boolean    @default(false)
-  twoFASecret      String?
-  accounts         Account[]
-  activities       Activity[]
-  artisan          Artisan?
-  comments         Comment[]
-  patterns         Pattern[]
-  sessions         Session[]
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  name               String?
+  passwordHash       String?
+  role               Role                @default(VIEWER)
+  emailVerified      DateTime?
+  bio                String?
+  location           String?
+  website            String?
+  github             String?
+  twitter            String?
+  specialty          String?
+  avatar             String?
+  verified           Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  allowIndexing      Boolean             @default(true)
+  emailComments      Boolean             @default(true)
+  emailDownloads     Boolean             @default(false)
+  emailNewsletter    Boolean             @default(false)
+  emailValidations   Boolean             @default(true)
+  google             String?
+  profilePublic      Boolean             @default(true)
+  pushBrowser        Boolean             @default(true)
+  pushValidations    Boolean             @default(true)
+  shareAnalytics     Boolean             @default(false)
+  showEmail          Boolean             @default(false)
+  showLocation       Boolean             @default(true)
+  twoFAEnabled       Boolean             @default(false)
+  twoFASecret        String?
+  accounts           Account[]
+  activities         Activity[]
+  artisan            Artisan?
+  comments           Comment[]
+  patterns           Pattern[]
+  passwordResetToken PasswordResetToken?
+  sessions           Session[]
 
   @@index([createdAt])
   @@map("users")
@@ -75,16 +76,30 @@ model Pattern {
   comments     Comment[]
   origin       Origin?
   colors       PatternColor[]
+  format       PatternFormat  @default(CSS)
+  cssCode      String?
+  svgContent   String?
   creator      User           @relation(fields: [createdById], references: [id])
   symbolism    Symbolism?
   symbols      Symbol[]
 
   @@index([slug])
   @@index([type])
+  @@index([format])
   @@index([status])
   @@index([isFeatured])
   @@index([createdById])
   @@map("patterns")
+}
+
+model StaticPatternMetric {
+  slug      String   @id
+  views     Int      @default(0)
+  downloads Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("static_pattern_metrics")
 }
 
 model Origin {
@@ -171,6 +186,18 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Artisan {
@@ -292,6 +319,12 @@ enum PatternType {
   NDOP
   WAX
   BERBER
+}
+
+enum PatternFormat {
+  SVG
+  CSS
+  HYBRID
 }
 
 enum Status {

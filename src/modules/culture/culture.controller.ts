@@ -12,6 +12,9 @@ import { logger } from '@/shared/utils/logger';
 import { createStorageService } from '@/infra/storage/storage.factory';
 import { PatternListResponseMapper } from './dto/PatternListResponse.mapper';
 import { db } from '@/config/database';
+import { generateVectorSvgFromCss } from './utils/svgExporter';
+import { isStaticPatternSlug, STATIC_PATTERN_EXPORTS } from './staticPatternRegistry';
+import { AppError } from '@/shared/errors/AppError';
 
 // ── Multer configuration for SVG file upload ─────────────────────────────────────
 const storage = multer.diskStorage({
@@ -62,6 +65,30 @@ export const uploadSvg = multer({
     files: 21, // 1 SVG + up to 20 symbol images
   },
 });
+
+function forwardStaticMetricsError(error: unknown, next: NextFunction): void {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2021' &&
+    'meta' in error &&
+    typeof error.meta === 'object' &&
+    error.meta !== null &&
+    'table' in error.meta &&
+    typeof error.meta.table === 'string' &&
+    error.meta.table.includes('static_pattern_metrics')
+  ) {
+    next(new AppError(
+      'La table des statistiques de motifs statiques est absente. Exécutez « npx prisma migrate deploy » depuis avs-backend.',
+      StatusCodes.SERVICE_UNAVAILABLE,
+      'STATIC_PATTERN_METRICS_MIGRATION_REQUIRED',
+    ));
+    return;
+  }
+
+  next(error);
+}
 
 // ── Comprehensive Zod Schema matching frontend 3-step form ─────────────────────
 const ColorSchema = z.object({
@@ -124,7 +151,6 @@ const CreateSchema = z.object({
 
   // Step 3: Colors & Assets
   colors: z.array(ColorSchema).min(2, 'At least 2 colors required').max(5),
-  svgPattern: z.string().optional(),
   artisanQuote: ArtisanQuoteSchema,
   sources: z.array(z.string().min(1)).min(1, 'At least one source required').max(10),
   symbols: z.array(SymbolSchema).min(1, 'At least one symbol required').max(20),
@@ -231,14 +257,41 @@ export class CultureController {
         return;
       }
 
-      // Increment views
-      await db.pattern.update({
+      if (pattern.status !== 'PUBLISHED') {
+        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        return;
+      }
+
+      const updatedPattern = await db.pattern.update({
         where: { id: pattern.id },
-        data: { views: pattern.views + 1 },
+        data: { views: { increment: 1 } },
+        include: { origin: true, colors: true, symbols: true, artisanQuote: true, symbolism: true },
       });
 
-      const response = PatternListResponseMapper.toPatternDoc(pattern);
+      const response = PatternListResponseMapper.toPatternDoc(updatedPattern);
       res.json(ok(response));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  getShareData = async (
+    req: Request<{ slug: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const pattern = await db.pattern.findUnique({
+        where: { slug: req.params.slug },
+        include: { origin: true, colors: true, symbols: true, artisanQuote: true, symbolism: true },
+      });
+
+      if (!pattern || pattern.status !== 'PUBLISHED') {
+        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        return;
+      }
+
+      res.json(ok(PatternListResponseMapper.toPatternDoc(pattern)));
     } catch (err) {
       next(err);
     }
@@ -341,7 +394,8 @@ export class CultureController {
         nameLocal: validatedData.nameLocal,
         imgUrl: formData.svgFilePath || '',
         type: validatedData.patternType.toUpperCase() as any,
-        cssClass: `pattern-${validatedData.patternType}`,
+        cssClass: validatedData.patternType.toLowerCase(),
+        format: formData.svgFilePath ? 'SVG' as const : 'CSS' as const,
         era: validatedData.era,
         license: validatedData.license,
         summary: validatedData.summary,
@@ -361,7 +415,6 @@ export class CultureController {
           coords: validatedData.coords || [0, 0],
         } : undefined,
         artisanQuote: validatedData.artisanQuote,
-        svgPattern: validatedData.svgPattern,
       };
 
       const result = await this.service.createPattern(serviceDto);
@@ -494,7 +547,10 @@ export class CultureController {
       // Map basic fields if provided
       if (validatedData.nameEn) serviceDto.name = validatedData.nameEn;
       if (validatedData.nameLocal) serviceDto.nameLocal = validatedData.nameLocal;
-      if (validatedData.patternType) serviceDto.type = validatedData.patternType;
+      if (validatedData.patternType) {
+        serviceDto.type = validatedData.patternType;
+        serviceDto.cssClass = validatedData.patternType.toLowerCase();
+      }
       if (validatedData.era) serviceDto.era = validatedData.era;
       if (validatedData.license) serviceDto.license = validatedData.license;
       if (validatedData.summary) serviceDto.summary = validatedData.summary;
@@ -504,6 +560,7 @@ export class CultureController {
       if (validatedData.ceremonial) serviceDto.ceremonial = validatedData.ceremonial;
       if (validatedData.sources) serviceDto.sources = validatedData.sources;
       if (formData.svgFilePath) serviceDto.imgUrl = formData.svgFilePath;
+      if (formData.svgFilePath) serviceDto.format = 'SVG';
       
       // Map origin if provided
       if (validatedData.region && validatedData.country) {
@@ -520,7 +577,6 @@ export class CultureController {
       if (validatedData.colors) serviceDto.colors = validatedData.colors;
       if (validatedData.symbols) serviceDto.symbols = validatedData.symbols;
       if (validatedData.artisanQuote) serviceDto.artisanQuote = validatedData.artisanQuote;
-      if (validatedData.svgPattern) serviceDto.svgPattern = validatedData.svgPattern;
 
       const result = await this.service.updatePattern(
         req.params.id,
@@ -594,45 +650,233 @@ export class CultureController {
     }
   };
 
+  preview = async (
+    req: Request<{ slug: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      if (isStaticPatternSlug(req.params.slug)) {
+        const staticPattern = STATIC_PATTERN_EXPORTS[req.params.slug];
+        const svgContent = generateVectorSvgFromCss({
+          id: req.params.slug,
+          name: staticPattern.name,
+          slug: req.params.slug,
+          type: staticPattern.type,
+          cssClass: staticPattern.type.toLowerCase(),
+          colors: staticPattern.colors.map((hex) => ({ hex })),
+        });
+
+        res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+        res.send(svgContent);
+        return;
+      }
+
+      const pattern = await db.pattern.findUnique({
+        where: { slug: req.params.slug },
+        include: { colors: true },
+      });
+
+      if (!pattern || pattern.status !== 'PUBLISHED') {
+        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        return;
+      }
+
+      let svgContent = pattern.svgContent || '';
+      if (!svgContent && pattern.imgUrl?.includes('/patterns/')) {
+        const urlParts = pattern.imgUrl.split('/patterns/');
+        if (urlParts[1]) {
+          const fileBuffer = await this.storage.download(urlParts[1]);
+          svgContent = fileBuffer.toString('utf-8');
+        }
+      }
+
+      if (!svgContent) {
+        svgContent = generateVectorSvgFromCss({
+          id: pattern.id,
+          name: pattern.name || 'Motif AVS',
+          slug: pattern.slug,
+          type: pattern.type,
+          format: pattern.format,
+          cssClass: pattern.cssClass,
+          cssCode: pattern.cssCode,
+          colors: pattern.colors,
+        });
+      }
+
+      res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+      res.send(svgContent);
+    } catch (err) {
+      next(err);
+    }
+  };
+
   download = async (
     req: Request<{ id: string }>,
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
     try {
+      if (isStaticPatternSlug(req.params.id)) {
+        const staticPattern = STATIC_PATTERN_EXPORTS[req.params.id];
+        const svgContent = generateVectorSvgFromCss({
+          id: req.params.id,
+          name: staticPattern.name,
+          slug: req.params.id,
+          type: staticPattern.type,
+          cssClass: staticPattern.type.toLowerCase(),
+          colors: staticPattern.colors.map(hex => ({ hex })),
+        });
+        const fileBuffer = Buffer.from(svgContent, 'utf-8');
+        await db.staticPatternMetric.upsert({
+          where: { slug: req.params.id },
+          create: { slug: req.params.id, downloads: 1 },
+          update: { downloads: { increment: 1 } },
+        });
+        res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${req.params.id}.svg"`);
+        res.send(fileBuffer);
+        return;
+      }
+
       const pattern = await this.service.getPatternForDownload(req.params.id);
-      
-      // Extract the file path from the URL
-      // URL format: https://.../storage/v1/object/public/patterns/filename.svg
-      if (!pattern.imgUrl) {
-        res.status(404).json({ success: false, message: 'Pattern SVG URL not found' });
+      if (pattern.status !== 'PUBLISHED') {
+        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
         return;
       }
+      let fileBuffer: Buffer | null = null;
 
-      const urlParts = pattern.imgUrl.split('/patterns/');
-      if (urlParts.length < 2 || !urlParts[1]) {
-        res.status(400).json({ success: false, message: 'Invalid pattern URL' });
-        return;
+      if (pattern.svgContent) {
+        fileBuffer = Buffer.from(pattern.svgContent, 'utf-8');
+      } else if (pattern.imgUrl && pattern.imgUrl.includes('/patterns/')) {
+        const urlParts = pattern.imgUrl.split('/patterns/');
+        if (urlParts[1]) {
+          fileBuffer = await this.storage.download(urlParts[1]);
+        }
       }
-      const filePath = urlParts[1] as string;
 
-      // Use storage provider to download the file
-      const fileBuffer = await this.storage.download(filePath);
-
+      // Generer un document SVG vectoriel natif et valide pour l'export (Figma, Illustrator, Web)
       if (!fileBuffer) {
-        res.status(404).json({ success: false, message: 'Failed to download SVG from storage' });
-        return;
+        const svgContent = generateVectorSvgFromCss({
+          id: pattern.id,
+          name: pattern.name || 'Motif AVS',
+          slug: pattern.slug,
+          type: pattern.type,
+          format: pattern.format,
+          cssClass: pattern.cssClass,
+          cssCode: pattern.cssCode,
+          svgContent: pattern.svgContent,
+          colors: pattern.colors,
+        });
+        fileBuffer = Buffer.from(svgContent, 'utf-8');
       }
       
-      // Increment download counter
-      await this.service.incrementDownload(req.params.id);
+      // Increment download counter atomically in DB
+      await db.pattern.update({
+        where: { id: pattern.id },
+        data: { downloads: { increment: 1 } },
+      });
 
-      // Send SVG file
-      res.setHeader('Content-Type', 'image/svg+xml');
-      res.setHeader('Content-Disposition', `attachment; filename="${pattern.slug}.svg"`);
+      // Log download activity in DB
+      try {
+        await db.activity.create({
+          data: {
+            userId: req.user?.userId || 'anonymous',
+            action: 'DOWNLOADED',
+            targetId: pattern.id,
+            targetType: 'PATTERN',
+            metadata: { format: pattern.format || 'CSS' },
+          },
+        });
+      } catch (logErr) {
+        logger.warn(`Could not log activity for download of pattern ${pattern.id}: ${logErr}`);
+      }
+
+      // Send SVG file attachment
+      res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${pattern.slug || 'motif-avs'}.svg"`);
       res.send(fileBuffer);
     } catch (err) {
-      next(err);
+      forwardStaticMetricsError(err, next);
+    }
+  };
+
+  trackView = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const pattern = await db.pattern.findFirst({
+        where: { OR: [{ id: req.params.id }, { slug: req.params.id }] },
+        select: { id: true, status: true },
+      });
+
+      if (pattern) {
+        if (pattern.status !== 'PUBLISHED') {
+          res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+          return;
+        }
+        const updated = await db.pattern.update({
+          where: { id: pattern.id },
+          data: { views: { increment: 1 } },
+          select: { views: true, downloads: true },
+        });
+        res.json(ok(updated, 'View incremented successfully'));
+        return;
+      }
+
+      if (!isStaticPatternSlug(req.params.id)) {
+        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        return;
+      }
+
+      const updated = await db.staticPatternMetric.upsert({
+        where: { slug: req.params.id },
+        create: { slug: req.params.id, views: 1 },
+        update: { views: { increment: 1 } },
+        select: { views: true, downloads: true },
+      });
+      res.json(ok(updated, 'View incremented successfully'));
+    } catch (err) {
+      forwardStaticMetricsError(err, next);
+    }
+  };
+
+  getStats = async (
+    req: Request<{ slug: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const pattern = await db.pattern.findFirst({
+        where: { OR: [{ id: req.params.slug }, { slug: req.params.slug }] },
+        select: { status: true, views: true, downloads: true },
+      });
+
+      if (pattern) {
+        if (pattern.status !== 'PUBLISHED') {
+          res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+          return;
+        }
+        res.json(ok({ views: pattern.views, downloads: pattern.downloads }));
+        return;
+      }
+
+      if (!isStaticPatternSlug(req.params.slug)) {
+        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        return;
+      }
+
+      const metrics = await db.staticPatternMetric.findUnique({
+        where: { slug: req.params.slug },
+        select: { views: true, downloads: true },
+      });
+      res.json(ok(metrics ?? { views: 0, downloads: 0 }));
+    } catch (err) {
+      forwardStaticMetricsError(err, next);
     }
   };
 

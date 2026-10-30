@@ -3,6 +3,7 @@ import { AuthController } from '@/modules/auth/auth.controller';
 import { AuthService } from '@/modules/auth/application/auth.service';
 import { PrismaUserRepository } from '@/modules/user/infrastructure/PrismaUserRepository';
 import { db } from '@/config/database';
+import { authRateLimiter } from '@/shared/middlewares/security.middleware';
 
 const router = Router();
 
@@ -97,6 +98,60 @@ router.post('/register', controller.register);
  *         description: Invalid credentials
  */
 router.post('/login', controller.login);
+
+/**
+ * @swagger
+ * /api/v1/auth/forgot-password:
+ *   post:
+ *     summary: Request a password reset email
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               locale:
+ *                 type: string
+ *                 enum: [fr, en]
+ *     responses:
+ *       200:
+ *         description: A generic response that does not reveal whether the account exists
+ */
+router.post('/forgot-password', authRateLimiter, controller.requestPasswordReset);
+
+/**
+ * @swagger
+ * /api/v1/auth/reset-password:
+ *   post:
+ *     summary: Set a new password with a one-time reset token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, password]
+ *             properties:
+ *               token:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *                 maxLength: 128
+ *     responses:
+ *       200:
+ *         description: Password updated
+ *       400:
+ *         description: Reset token is invalid or expired
+ */
+router.post('/reset-password', authRateLimiter, controller.resetPassword);
 
 /**
  * @swagger

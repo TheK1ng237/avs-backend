@@ -513,4 +513,115 @@ router.delete('/me/sessions/:sessionId', authenticate, controller.revokeSession)
  */
 router.post('/me/sessions/revoke-all', authenticate, controller.revokeAllSessions);
 
+/**
+ * @swagger
+ * /api/v1/users/me/2fa/setup:
+ *   get:
+ *     summary: Initiate 2FA setup
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 2FA setup secret and QR code URL
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     secret: { type: string }
+ *                     otpauthUrl: { type: string }
+ *                     qrCodeUrl: { type: string }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.get('/me/2fa/setup', authenticate, controller.setup2FA);
+
+/**
+ * @swagger
+ * /api/v1/users/me/2fa/verify:
+ *   post:
+ *     summary: Verify and enable 2FA
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 example: '123456'
+ *     responses:
+ *       200:
+ *         description: 2FA enabled successfully
+ *       400:
+ *         description: Invalid verification code
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.post('/me/2fa/verify', authenticate, controller.verify2FA);
+
+/**
+ * @swagger
+ * /api/v1/users/me/2fa/disable:
+ *   post:
+ *     summary: Disable 2FA
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 2FA disabled successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.post('/me/2fa/disable', authenticate, controller.disable2FA);
+
+/**
+ * @swagger
+ * /api/v1/users/me/export:
+ *   get:
+ *     summary: Export user data (GDPR)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User personal data JSON export
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.get('/me/export', authenticate, controller.exportData);
+
+/**
+ * @swagger
+ * /api/v1/users/me/deactivate:
+ *   post:
+ *     summary: Deactivate user account
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Account deactivated successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.post('/me/deactivate', authenticate, controller.deactivate);
+
 export default router;
+

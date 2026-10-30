@@ -9,7 +9,7 @@
 
 import type { PrismaClient, Prisma } from '@prisma/client';
 import type { ICultureRepository, FindPatternsOptions, FindResult } from '../domain/ICultureRepository';
-import { CulturePattern, type PatternType } from '../domain/CulturePattern';
+import { CulturePattern, type PatternType, type PatternFormat } from '../domain/CulturePattern';
 
 export class PrismaCultureRepository implements ICultureRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -79,7 +79,10 @@ export class PrismaCultureRepository implements ICultureRepository {
       nameLocal: props.nameLocal || 'Unknown',
       imgUrl: props.imgUrl || '',
       type: props.type,
+      format: props.format || 'CSS',
       cssClass: props.cssClass,
+      cssCode: props.cssCode || null,
+      svgContent: props.svgContent || null,
       era: props.era,
       license: props.license,
       summary: props.summary,
@@ -212,7 +215,10 @@ export class PrismaCultureRepository implements ICultureRepository {
       nameLocal: row.nameLocal,
       imgUrl: row.imgUrl,
       type: row.type as PatternType,
+      format: (row.format as PatternFormat) || 'CSS',
       cssClass: row.cssClass,
+      cssCode: row.cssCode,
+      svgContent: row.svgContent,
       era: row.era,
       license: row.license,
       summary: row.summary,
@@ -245,7 +251,10 @@ export class PrismaCultureRepository implements ICultureRepository {
       nameLocal: props.nameLocal || 'Unknown',
       imgUrl: props.imgUrl || '',
       type: props.type,
+      format: props.format || 'CSS',
       cssClass: props.cssClass,
+      cssCode: props.cssCode || null,
+      svgContent: props.svgContent || null,
       era: props.era,
       license: props.license,
       summary: props.summary,
@@ -331,4 +340,3 @@ export class PrismaCultureRepository implements ICultureRepository {
     return data;
   }
 }
-

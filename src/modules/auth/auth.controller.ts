@@ -9,6 +9,20 @@ const LoginSchema = z.object({
   password: z.string().min(8),
 });
 
+const PasswordResetRequestSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email()
+    .transform((email) => email.toLowerCase()),
+  locale: z.enum(['fr', 'en']).default('fr'),
+});
+
+const PasswordResetSchema = z.object({
+  token: z.string().min(64).max(128),
+  password: z.string().min(8).max(128),
+});
+
 const RegisterSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -37,9 +51,9 @@ export class AuthController {
 
       this.setAuthCookies(res, result.tokens);
 
-      res.status(StatusCodes.CREATED).json(
-        ok({ user: result.user }, 'User registered successfully')
-      );
+      res
+        .status(StatusCodes.CREATED)
+        .json(ok({ user: result.user }, 'User registered successfully'));
     } catch (err) {
       next(err);
     }
@@ -56,6 +70,31 @@ export class AuthController {
       this.setAuthCookies(res, result.tokens);
 
       res.json(ok({ user: result.user }, 'Login successful'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  requestPasswordReset = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const data = PasswordResetRequestSchema.parse(req.body);
+      await this.service.requestPasswordReset(data);
+      res.json(
+        ok(
+          null,
+          'Si cette adresse est associée à un compte, un e-mail de réinitialisation sera envoyé.',
+        ),
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const data = PasswordResetSchema.parse(req.body);
+      await this.service.resetPassword(data.token, data.password);
+      res.json(ok(null, 'Mot de passe réinitialisé avec succès.'));
     } catch (err) {
       next(err);
     }

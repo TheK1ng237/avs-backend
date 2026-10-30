@@ -134,7 +134,9 @@ router.get('/recent/global', authenticate, controller.getRecentGlobal);
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
+router.get('/:slug/share', publicApiRateLimiter, controller.getShareData);
 router.get('/:slug', publicApiRateLimiter, controller.getBySlug);
+router.get('/:slug/stats', publicApiRateLimiter, controller.getStats);
 
 /**
  * @swagger
@@ -276,10 +278,6 @@ router.get('/:slug', publicApiRateLimiter, controller.getBySlug);
  *                 type: string
  *                 description: Tableau JSON d'objets couleurs avec hex, name, meaning
  *                 example: '[{"hex": "#C0573E", "name": "Rouleur", "meaning": "Force et pouvoir"}, {"hex": "#F5EBE0", "name": "Paix", "meaning": "Harmonie et sérénité"}]'
- *               svgPattern:
- *                 type: string
- *                 description: Nom de classe CSS pour le motif
- *                 example: avs-pattern-ndop-sultan
  *               artisanQuote:
  *                 type: string
  *                 description: Objet JSON avec citation artisan (optionnel)
@@ -505,10 +503,6 @@ router.post('/', authenticate, authRateLimiter, uploadSvg.fields([
  *                 type: string
  *                 description: Tableau JSON d'objets couleurs avec hex, name, meaning
  *                 example: '[{"hex": "#C0573E", "name": "Rouleur", "meaning": "Force et pouvoir"}, {"hex": "#F5EBE0", "name": "Paix", "meaning": "Harmonie et sérénité"}]'
- *               svgPattern:
- *                 type: string
- *                 description: Nom de classe CSS pour le motif
- *                 example: avs-pattern-ndop-sultan
  *               artisanQuote:
  *                 type: string
  *                 description: Objet JSON avec citation artisan (optionnel)
@@ -697,7 +691,8 @@ router.delete('/:id', authenticate, requireAdmin, controller.remove);
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
-router.get('/:id/download', controller.download);
+router.get('/:slug/preview', publicApiRateLimiter, controller.preview);
+router.get('/:id/download', publicApiRateLimiter, controller.download);
+router.post('/:id/view', publicApiRateLimiter, controller.trackView);
 
 export default router;
-
