@@ -4,7 +4,7 @@ import { UserController } from '@/modules/user/user.controller';
 import { UserService } from '@/modules/user/application/user.service';
 import { PrismaUserRepository } from '@/modules/user/infrastructure/PrismaUserRepository';
 import { authenticate, requireAdmin, requireSuperAdmin } from '@/shared/middlewares/auth.middleware';
-import { db } from '@/config/database';
+import { db } from '@/infra/database/database';
 
 const router = Router();
 
@@ -624,4 +624,3 @@ router.get('/me/export', authenticate, controller.exportData);
 router.post('/me/deactivate', authenticate, controller.deactivate);
 
 export default router;
-

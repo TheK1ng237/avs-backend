@@ -20,10 +20,8 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "paths": {
-      "@/api/*":    ["./src/api/*"],
       "@/modules/*":["./src/modules/*"],
       "@/shared/*": ["./src/shared/*"],
-      "@/config/*": ["./src/config/*"],
       "@/infra/*":  ["./src/infrastructure/*"]
     }
   },

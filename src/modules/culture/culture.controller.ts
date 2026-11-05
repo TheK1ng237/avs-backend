@@ -11,7 +11,7 @@ import { StatusCodes } from 'http-status-codes';
 import { logger } from '@/shared/utils/logger';
 import { createStorageService } from '@/infra/storage/storage.factory';
 import { PatternListResponseMapper } from './dto/PatternListResponse.mapper';
-import { db } from '@/config/database';
+import { db } from '@/infra/database/database';
 import { generateVectorSvgFromCss } from './utils/svgExporter';
 import { isStaticPatternSlug, STATIC_PATTERN_EXPORTS } from './staticPatternRegistry';
 import { AppError } from '@/shared/errors/AppError';

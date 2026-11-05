@@ -4,7 +4,7 @@ import { ActivityService } from '@/modules/activity/application/activity.service
 import { PrismaActivityRepository } from '@/modules/activity/infrastructure/PrismaActivityRepository';
 import { authenticate } from '@/shared/middlewares/auth.middleware';
 import { publicApiRateLimiter } from '@/shared/middlewares/security.middleware';
-import { db } from '@/config/database';
+import { db } from '@/infra/database/database';
 
 const router = Router();
 

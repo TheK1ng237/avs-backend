@@ -4,7 +4,7 @@ import { PaletteService } from '@/modules/palette/application/palette.service';
 import { PrismaPaletteRepository } from '@/modules/palette/infrastructure/PrismaPaletteRepository';
 import { authenticate, requireAdmin } from '@/shared/middlewares/auth.middleware';
 import { publicApiRateLimiter } from '@/shared/middlewares/security.middleware';
-import { db } from '@/config/database';
+import { db } from '@/infra/database/database';
 
 const router = Router();
 

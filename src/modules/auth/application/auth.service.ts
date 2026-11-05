@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { db } from '@/config/database';
+import { db } from '@/infra/database/database';
 import { PrismaUserRepository } from '@/modules/user/infrastructure/PrismaUserRepository';
 import { AppError, UnauthorizedError, ConflictError } from '@/shared/errors/AppError';
 import { logger } from '@/shared/utils/logger';
