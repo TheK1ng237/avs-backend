@@ -93,29 +93,11 @@ export class UserController {
       const user = await this.service.getUserById(userId);
       const { passwordHash, ...safeUser } = user;
 
-      // Refresh session cookie (httpOnly) on each /me request
-      this.refreshSessionCookie(req, res);
-
       res.json(ok(safeUser, 'User retrieved'));
     } catch (err) {
       next(err);
     }
   };
-
-  private refreshSessionCookie(req: Request, res: Response): void {
-    const isProd = process.env.NODE_ENV === 'production';
-    const authHeader = req.headers.authorization;
-
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      res.cookie('avs_session', token, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24h
-      });
-    }
-  }
 
   getStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -488,4 +470,3 @@ export class UserController {
     }
   };
 }
-

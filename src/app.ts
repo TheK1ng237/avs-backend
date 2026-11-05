@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import compression from 'compression';
-import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import swaggerUi from 'swagger-ui-express';
 
@@ -47,7 +46,6 @@ app.use(compression());
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-app.use(cookieParser());
 app.use(morgan('combined', { stream: { write: msg => logger.http(msg.trim()) } }));
 
 // ── Swagger UI ────────────────────────────────────────────────────────────────
