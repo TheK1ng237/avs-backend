@@ -49,6 +49,7 @@ export interface AuthResponse {
 
 export class AuthService {
   private readonly jwtSecret = process.env.JWT_SECRET!;
+  private readonly jwtRefreshSecret = process.env.JWT_REFRESH_SECRET ?? this.jwtSecret;
   private readonly accessExpiry = '24h';
   private readonly refreshExpiry = '7d';
 
@@ -301,7 +302,14 @@ export class AuthService {
   // ─────────────────────────────────────────
   async refreshToken(token: string): Promise<AuthResponse> {
     try {
-      const payload = jwt.verify(token, this.jwtSecret) as any;
+      const payload = jwt.verify(token, this.jwtRefreshSecret) as jwt.JwtPayload & {
+        userId: string;
+        tokenType: string;
+      };
+
+      if (payload.tokenType !== 'refresh') {
+        throw new UnauthorizedError('Invalid refresh token');
+      }
 
       const user = await this.userRepository.findById(payload.userId);
 
@@ -325,6 +333,7 @@ export class AuthService {
       {
         userId: user.id,
         email: user.email,
+        tokenType: 'access',
         role: user.role.toLowerCase() as
           | 'viewer'
           | 'contributor'
@@ -336,7 +345,7 @@ export class AuthService {
       { expiresIn: this.accessExpiry },
     );
 
-    const refreshToken = jwt.sign({ userId: user.id }, this.jwtSecret, {
+    const refreshToken = jwt.sign({ userId: user.id, tokenType: 'refresh' }, this.jwtRefreshSecret, {
       expiresIn: this.refreshExpiry,
     });
 

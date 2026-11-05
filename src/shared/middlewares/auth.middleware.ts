@@ -5,6 +5,7 @@ import { UnauthorizedError, ForbiddenError } from '../errors/AppError';
 export interface JwtPayload {
   userId: string;
   email:  string;
+  tokenType: 'access';
   role:   'viewer' | 'contributor' | 'curator' | 'admin' | 'super_admin';
   iat:    number;
   exp:    number;
@@ -17,13 +18,12 @@ declare module 'express-serve-static-core' {
 
 /**
  * Middleware d'authentification
- * Lit le token depuis le cookie HttpOnly: avs_access
+ * Authentifie les requêtes à partir d'un JWT Bearer.
  */
 export const authenticate: RequestHandler = (req, _res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-    const token = req.cookies?.avs_access || req.cookies?.avs_session || bearerToken;
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
     if (!token) {
       throw new UnauthorizedError('Token manquant');
@@ -33,6 +33,9 @@ export const authenticate: RequestHandler = (req, _res, next) => {
     if (!secret) { throw new Error('JWT_SECRET non configuré'); }
 
     const payload = jwt.verify(token, secret) as JwtPayload;
+    if (payload.tokenType !== 'access') {
+      throw new UnauthorizedError('Type de token invalide');
+    }
     req.user = payload;
     next();
   } catch (err) {
