@@ -1,5 +1,5 @@
 import app from './app';
-import { connectDatabase, disconnectDatabase } from '@/config/database';
+import { connectDatabase, disconnectDatabase } from '@/infra/database/database';
 import { logger } from '@/shared/utils/logger';
 
 const PORT = parseInt(process.env.PORT ?? '4000', 10);

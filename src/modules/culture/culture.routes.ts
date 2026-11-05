@@ -4,7 +4,7 @@ import { CultureService }    from './application/culture.service';
 import { PrismaCultureRepository } from './infrastructure/PrismaCultureRepository';
 import { authenticate, requireCurator, requireAdmin } from '@/shared/middlewares/auth.middleware';
 import { publicApiRateLimiter, authRateLimiter } from '@/shared/middlewares/security.middleware';
-import { db } from '@/config/database';
+import { db } from '@/infra/database/database';
 
 const router = Router();
 

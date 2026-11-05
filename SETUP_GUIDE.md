@@ -309,14 +309,14 @@ JWT_REFRESH_SECRET=autre-clé-générée
 ```
 avs-backend/
 ├── src/
+│   ├── infrastructure/   # Prisma et stockage
 │   ├── modules/          # Fonctionnalités métier
-│   ├── common/           # Code partagé
-│   ├── config/           # Configuration
+│   ├── shared/           # Code partagé
 │   └── server.ts         # Point d'entrée
 ├── prisma/
 │   ├── schema.prisma     # Schéma de la base
 │   └── migrations/       # Historique des migrations
-├── tests/                # Tests unitaires et d'intégration
+├── tests/                # Tests unitaires
 ├── dist/                 # Code compilé (après build)
 ├── compose.yaml          # Docker Compose production
 ├── compose.dev.yaml      # Docker Compose développement
@@ -345,4 +345,3 @@ En cas de problème:
 2. Vérifiez que les ports sont libres
 3. Réinitialisez les volumes: `docker-compose down -v`
 4. Consultez la documentation officielle des outils
-

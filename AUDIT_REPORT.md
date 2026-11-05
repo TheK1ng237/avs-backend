@@ -615,7 +615,7 @@ Chaque migration est un snapshot SQL.
 #### 3. **Workflow Prisma dans Votre App**
 
 ```typescript
-// ✅ src/config/database.ts
+// ✅ src/infrastructure/database/database.ts
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient({
@@ -1352,4 +1352,3 @@ PORT=5000 npm start
 **Auteur** : Audit automatisé  
 **Dernière mise à jour** : 16 Juin 2026  
 **Prochaine revue** : Après premiers changements
-

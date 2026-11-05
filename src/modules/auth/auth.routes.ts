@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { AuthController } from '@/modules/auth/auth.controller';
 import { AuthService } from '@/modules/auth/application/auth.service';
 import { PrismaUserRepository } from '@/modules/user/infrastructure/PrismaUserRepository';
-import { db } from '@/config/database';
+import { db } from '@/infra/database/database';
 import { authRateLimiter } from '@/shared/middlewares/security.middleware';
 
 const router = Router();
