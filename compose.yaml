@@ -33,6 +33,9 @@ services:
       - NODE_ENV=production
       - PORT=4000
       - DATABASE_URL=postgresql://${PROD_DB_USER}:${PROD_DB_PASSWORD}@api-db:5432/${PROD_DB_NAME}?schema=public
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-patterns}
     deploy:
       resources:
         limits:

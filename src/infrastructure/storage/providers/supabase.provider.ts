@@ -10,7 +10,15 @@ export class SupabaseProvider implements IStorageProvider {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   ); 
 
-  private bucket = 'patterns';
+  private bucket: string;
+
+  constructor() {
+    const bucket = process.env.STORAGE_BUCKET;
+    if (!bucket) {
+      throw new Error('STORAGE_BUCKET must be set when using Supabase Storage');
+    }
+    this.bucket = bucket;
+  }
 
   async upload(file: Express.Multer.File, folder?: string) {
     const fileName = `${uuid()}-${file.originalname}`;
