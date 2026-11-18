@@ -17,7 +17,12 @@ import type {
   CreateSymbolData,
   UpdateSymbolData,
 } from '../domain/ICultureRepository';
-import { CulturePattern, type PatternType, type PatternFormat, type Symbol } from '../domain/CulturePattern';
+import {
+  CulturePattern,
+  type PatternType,
+  type PatternFormat,
+  type Symbol,
+} from '../domain/CulturePattern';
 
 export class PrismaCultureRepository implements ICultureRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -69,18 +74,18 @@ export class PrismaCultureRepository implements ICultureRepository {
       this.prisma.pattern.count({ where }),
     ]);
 
-    return { items: rows.map(r => this.toDomain(r)), totalItems };
+    return { items: rows.map((r) => this.toDomain(r)), totalItems };
   }
 
   async save(pattern: CulturePattern): Promise<CulturePattern> {
     const data = this.toPersistence(pattern);
-    const row  = await this.prisma.pattern.create({ data });
+    const row = await this.prisma.pattern.create({ data });
     return this.toDomain(row);
   }
 
   async update(pattern: CulturePattern): Promise<CulturePattern> {
     const props = pattern.toObject();
-    
+
     const data: any = {
       // Ne pas mettre à jour le slug pour éviter les conflits
       name: props.name || '',
@@ -316,7 +321,7 @@ export class PrismaCultureRepository implements ICultureRepository {
 
   private toPersistence(pattern: CulturePattern): Prisma.PatternCreateInput & { id: string } {
     const props = pattern.toObject();
-    
+
     const data: any = {
       id: props.id,
       slug: props.slug,

@@ -9,7 +9,13 @@
 // =============================================================================
 
 import { randomUUID } from 'crypto';
-import { CulturePattern, Symbolism, type CulturePatternProps, type PatternType, type Symbol } from '../domain/CulturePattern';
+import {
+  CulturePattern,
+  Symbolism,
+  type CulturePatternProps,
+  type PatternType,
+  type Symbol,
+} from '../domain/CulturePattern';
 import type {
   ICultureRepository,
   FindPatternsOptions,
@@ -25,23 +31,23 @@ import { buildMeta, parsePagination } from '@/shared/utils/pagination';
 // ── DTOs (Data Transfer Objects) ──────────────────────────────────────────────
 
 export interface CreatePatternDto {
-  name:       string;
-  nameLocal:  string;
-  imgUrl:     string;
-  type:       PatternType;
-  cssClass:   string;
-  era?:       string;
-  license?:   string;
-  summary:    string;
-  history:    string;
-  technique:  string;
-  symbolism:  Symbolism;
+  name: string;
+  nameLocal: string;
+  imgUrl: string;
+  type: PatternType;
+  cssClass: string;
+  era?: string;
+  license?: string;
+  summary: string;
+  history: string;
+  technique: string;
+  symbolism: Symbolism;
   ceremonial: string;
-  sources?:   string[];
+  sources?: string[];
   createdById?: string;
-  colors?:    any[];
-  symbols?:   any[];
-  origin?:    any;
+  colors?: any[];
+  symbols?: any[];
+  origin?: any;
   artisanQuote?: any;
   symbolUsage?: string;
   format?: 'SVG' | 'CSS' | 'HYBRID';
@@ -52,13 +58,13 @@ export interface CreatePatternDto {
 export interface UpdatePatternDto extends Partial<CreatePatternDto> {}
 
 export interface QueryPatternDto extends FindPatternsOptions {
-  page?:    number;
+  page?: number;
   perPage?: number;
 }
 
 export interface PatternListResult {
   items: CulturePattern[];
-  meta:  PaginationMeta;
+  meta: PaginationMeta;
 }
 
 export interface CreateCultureSymbolDto extends CreateSymbolData {}
@@ -75,7 +81,8 @@ export class CultureService {
 
     const { items, totalItems } = await this.repository.findMany({
       ...query,
-      page, perPage,
+      page,
+      perPage,
       onlyPublished: !requesterId,
     });
 
@@ -85,7 +92,9 @@ export class CultureService {
   // ── Cas d'usage : récupérer un motif ──────────────────────────────────────
   async getPatternBySlug(slug: string): Promise<CulturePattern> {
     const pattern = await this.repository.findBySlug(slug);
-    if (!pattern) { throw new NotFoundError(`Motif "${slug}"`); }
+    if (!pattern) {
+      throw new NotFoundError(`Motif "${slug}"`);
+    }
 
     const updated = pattern.incrementView();
     return this.repository.update(updated);
@@ -100,34 +109,34 @@ export class CultureService {
     }
 
     const pattern = CulturePattern.create({
-      id:          randomUUID(),
+      id: randomUUID(),
       slug,
-      name:        dto.name,
-      nameLocal:   dto.nameLocal,
-      imgUrl:      dto.imgUrl ?? null,
-      type:        dto.type,
-      format:      dto.format ?? (dto.imgUrl ? 'SVG' : 'CSS'),
-      cssClass:    dto.cssClass,
-      cssCode:     dto.cssCode,
-      svgContent:  dto.svgContent,
-      era:         dto.era ?? null,
-      license:     dto.license ?? null,
-      summary:     dto.summary,
-      history:     dto.history,
-      technique:   dto.technique,
-      symbolism:   dto.symbolism,
-      ceremonial:  dto.ceremonial,
-      sources:     dto.sources ?? [],
-      downloads:   0,
-      views:       0,
-      status:      'DRAFT',
-      isFeatured:  false,
+      name: dto.name,
+      nameLocal: dto.nameLocal,
+      imgUrl: dto.imgUrl ?? null,
+      type: dto.type,
+      format: dto.format ?? (dto.imgUrl ? 'SVG' : 'CSS'),
+      cssClass: dto.cssClass,
+      cssCode: dto.cssCode,
+      svgContent: dto.svgContent,
+      era: dto.era ?? null,
+      license: dto.license ?? null,
+      summary: dto.summary,
+      history: dto.history,
+      technique: dto.technique,
+      symbolism: dto.symbolism,
+      ceremonial: dto.ceremonial,
+      sources: dto.sources ?? [],
+      downloads: 0,
+      views: 0,
+      status: 'DRAFT',
+      isFeatured: false,
       createdById: dto.createdById ?? 'system',
-      createdAt:   new Date(),
-      updatedAt:   new Date(),
-      origin:      dto.origin,
-      colors:      dto.colors,
-      symbols:     dto.symbols,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      origin: dto.origin,
+      colors: dto.colors,
+      symbols: dto.symbols,
       artisanQuote: dto.artisanQuote,
     });
 
@@ -135,9 +144,15 @@ export class CultureService {
   }
 
   // ── Cas d'usage : mettre à jour un motif ──────────────────────────────────
-  async updatePattern(id: string, dto: UpdatePatternDto, requesterRole: string): Promise<CulturePattern> {
+  async updatePattern(
+    id: string,
+    dto: UpdatePatternDto,
+    requesterRole: string,
+  ): Promise<CulturePattern> {
     const pattern = await this.repository.findById(id);
-    if (!pattern) { throw new NotFoundError(`Motif #${id}`); }
+    if (!pattern) {
+      throw new NotFoundError(`Motif #${id}`);
+    }
 
     if (!this.isCuratorOrAdmin(requesterRole)) {
       throw new ForbiddenError('Seuls les curateurs, admins et super_admins peuvent modifier');
@@ -146,7 +161,7 @@ export class CultureService {
     // Vérifier si le slug a changé et si le nouveau slug existe déjà
     if (dto.nameLocal && dto.nameLocal !== pattern.nameLocal) {
       const newSlug = this.generateSlug(dto.nameLocal);
-      if (newSlug !== pattern.slug && await this.repository.exists(newSlug)) {
+      if (newSlug !== pattern.slug && (await this.repository.exists(newSlug))) {
         throw new ConflictError(`Motif avec le slug "${newSlug}" existe déjà`);
       }
     }
@@ -164,7 +179,9 @@ export class CultureService {
     }
 
     const pattern = await this.repository.findById(id);
-    if (!pattern) { throw new NotFoundError(`Motif #${id}`); }
+    if (!pattern) {
+      throw new NotFoundError(`Motif #${id}`);
+    }
 
     return this.repository.update(pattern.feature());
   }
@@ -176,19 +193,27 @@ export class CultureService {
     }
 
     const pattern = await this.repository.findById(id);
-    if (!pattern) { throw new NotFoundError(`Motif #${id}`); }
+    if (!pattern) {
+      throw new NotFoundError(`Motif #${id}`);
+    }
 
     return this.repository.update(pattern.unfeature());
   }
 
   // ── Cas d'usage : mettre à jour le statut d'un motif ───────────────────────
-  async updatePatternStatus(id: string, status: string, requesterRole: string): Promise<CulturePattern> {
+  async updatePatternStatus(
+    id: string,
+    status: string,
+    requesterRole: string,
+  ): Promise<CulturePattern> {
     if (!['admin', 'super_admin'].includes(requesterRole)) {
       throw new ForbiddenError('Seuls les admins et super_admins peuvent modifier le statut');
     }
 
     const pattern = await this.repository.findById(id);
-    if (!pattern) { throw new NotFoundError(`Motif #${id}`); }
+    if (!pattern) {
+      throw new NotFoundError(`Motif #${id}`);
+    }
 
     const updated = pattern.updateStatus(status.toUpperCase() as any);
     return this.repository.update(updated);
@@ -197,7 +222,9 @@ export class CultureService {
   // ── Cas d'usage : incrémenter les téléchargements ─────────────────────────
   async trackDownload(slug: string): Promise<CulturePattern> {
     const pattern = await this.repository.findBySlug(slug);
-    if (!pattern) { throw new NotFoundError(`Motif "${slug}"`); }
+    if (!pattern) {
+      throw new NotFoundError(`Motif "${slug}"`);
+    }
 
     return this.repository.update(pattern.incrementDownload());
   }
@@ -205,15 +232,19 @@ export class CultureService {
   // ── Cas d'usage : récupérer un motif pour téléchargement ─────────────────────
   async getPatternForDownload(id: string): Promise<CulturePattern> {
     const pattern = await this.repository.findById(id);
-    if (!pattern) { throw new NotFoundError(`Motif #${id}`); }
+    if (!pattern) {
+      throw new NotFoundError(`Motif #${id}`);
+    }
     return pattern;
   }
 
   // ── Cas d'usage : incrémenter le compteur de téléchargements par ID ───────────
   async incrementDownload(id: string): Promise<void> {
     const pattern = await this.repository.findById(id);
-    if (!pattern) { throw new NotFoundError(`Motif #${id}`); }
-    
+    if (!pattern) {
+      throw new NotFoundError(`Motif #${id}`);
+    }
+
     const updated = pattern.incrementDownload();
     await this.repository.update(updated);
   }
@@ -225,7 +256,9 @@ export class CultureService {
     }
 
     const pattern = await this.repository.findById(id);
-    if (!pattern) { throw new NotFoundError(`Motif #${id}`); }
+    if (!pattern) {
+      throw new NotFoundError(`Motif #${id}`);
+    }
 
     await this.repository.delete(id);
   }
@@ -262,7 +295,9 @@ export class CultureService {
     requesterRole: string,
   ): Promise<Symbol> {
     if (!this.isCuratorOrAdmin(requesterRole)) {
-      throw new ForbiddenError('Seuls les curateurs et administrateurs peuvent modifier un symbole');
+      throw new ForbiddenError(
+        'Seuls les curateurs et administrateurs peuvent modifier un symbole',
+      );
     }
 
     if (!(await this.repository.findSymbolById(id))) {
@@ -272,9 +307,26 @@ export class CultureService {
     return this.repository.updateSymbol(id, dto);
   }
 
+  async getSymbolById(id: string, requesterRole: string): Promise<Symbol> {
+    if (!this.isCuratorOrAdmin(requesterRole)) {
+      throw new ForbiddenError(
+        'Seuls les curateurs et administrateurs peuvent gérer les images de symboles',
+      );
+    }
+
+    const symbol = await this.repository.findSymbolById(id);
+    if (!symbol) {
+      throw new NotFoundError(`Symbole #${id}`);
+    }
+
+    return symbol;
+  }
+
   async deleteSymbol(id: string, requesterRole: string): Promise<void> {
     if (!this.isCuratorOrAdmin(requesterRole)) {
-      throw new ForbiddenError('Seuls les curateurs et administrateurs peuvent supprimer un symbole');
+      throw new ForbiddenError(
+        'Seuls les curateurs et administrateurs peuvent supprimer un symbole',
+      );
     }
 
     if (!(await this.repository.findSymbolById(id))) {

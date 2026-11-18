@@ -1,17 +1,22 @@
 import { Router } from 'express';
-import { CultureController, uploadSvg } from './culture.controller';
-import { CultureService }    from './application/culture.service';
+import { CultureController, uploadSvg, uploadSymbolImage } from './culture.controller';
+import { CultureService } from './application/culture.service';
 import { PrismaCultureRepository } from './infrastructure/PrismaCultureRepository';
-import { authenticate, optionalAuthenticate, requireCurator, requireAdmin } from '@/shared/middlewares/auth.middleware';
+import {
+  authenticate,
+  optionalAuthenticate,
+  requireCurator,
+  requireAdmin,
+} from '@/shared/middlewares/auth.middleware';
 import { publicApiRateLimiter, authRateLimiter } from '@/shared/middlewares/security.middleware';
 import { db } from '@/infra/database/database';
 
 const router = Router();
 
 // Composition root (Dependency Injection manuelle)
-const repository  = new PrismaCultureRepository(db);
-const service     = new CultureService(repository);
-const controller  = new CultureController(service);
+const repository = new PrismaCultureRepository(db);
+const service = new CultureService(repository);
+const controller = new CultureController(service);
 
 /**
  * @swagger
@@ -42,25 +47,33 @@ router.get('/symbols', optionalAuthenticate, publicApiRateLimiter, controller.li
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [name, nameFr, cssPreview, meaning, usage]
+ *             required: [name, nameFr, cssPreview, meaning, usage, sacred]
  *             properties:
  *               name: { type: string, maxLength: 128 }
  *               nameFr: { type: string, maxLength: 128 }
  *               cssPreview: { type: string, example: '#D4A017' }
- *               imageUrl: { type: string, format: uri }
+ *               image: { type: string, format: binary, description: "JPEG, PNG, WebP ou GIF, 5 Mo maximum" }
  *               meaning: { type: string, maxLength: 2000 }
  *               usage: { type: string, maxLength: 1000 }
- *               sacred: { type: boolean }
+ *               sacred: { type: string, enum: ['true', 'false'] }
  *     responses:
  *       201:
  *         description: Symbole créé
  *       403:
  *         description: Rôle curateur ou administrateur requis
+ *       413:
+ *         description: Image supérieure à 5 Mo
  */
-router.post('/:patternId/symbols', authenticate, requireCurator, controller.createSymbol);
+router.post(
+  '/:patternId/symbols',
+  authenticate,
+  requireCurator,
+  uploadSymbolImage.single('image'),
+  controller.createSymbol,
+);
 
 /**
  * @swagger
@@ -80,8 +93,16 @@ router.post('/:patternId/symbols', authenticate, requireCurator, controller.crea
  *         description: Symbole mis à jour
  *       403:
  *         description: Rôle curateur ou administrateur requis
+ *       413:
+ *         description: Image supérieure à 5 Mo
  */
-router.patch('/symbols/:id', authenticate, requireCurator, controller.updateSymbol);
+router.patch(
+  '/symbols/:id',
+  authenticate,
+  requireCurator,
+  uploadSymbolImage.single('image'),
+  controller.updateSymbol,
+);
 
 /**
  * @swagger
@@ -311,7 +332,7 @@ router.get('/:slug/stats', publicApiRateLimiter, controller.getStats);
  *                 type: string
  *                 enum: ['cc0', 'cc-by', 'cc-by-sa']
  *                 default: cc-by
- *               
+ *
  *               # Step 2: Description
  *               summary:
  *                 type: string
@@ -363,7 +384,7 @@ router.get('/:slug/stats', publicApiRateLimiter, controller.getStats);
  *                 type: string
  *                 description: Tableau JSON de mots-clés
  *                 example: '["royauté", "spiritualité", "bamoum", "tradition"]'
- *               
+ *
  *               # Step 3: Colors & Assets
  *               colors:
  *                 type: string
@@ -381,7 +402,7 @@ router.get('/:slug/stats', publicApiRateLimiter, controller.getStats);
  *                 type: string
  *                 description: Tableau JSON de symboles constituants avec name, nameFr, meaning, usage, sacred, cssPreview, imageUrl (optionnel)
  *                 example: '[{"name": "Sankofa", "nameFr": "Sankofa", "cssPreview": "#D4A017", "meaning": "Retour aux sources", "usage": "spirituel", "sacred": false, "imageUrl": "https://cdn.avs-standard.com/symbols/sankofa.png"}]'
- *               
+ *
  *               # File upload
  *               svgFile:
  *                 type: string
@@ -427,29 +448,35 @@ router.get('/:slug/stats', publicApiRateLimiter, controller.getStats);
  *       422:
  *         $ref: '#/components/responses/ValidationError'
  */
-router.post('/', authenticate, authRateLimiter, uploadSvg.fields([
-  { name: 'svgFile', maxCount: 1 },
-  { name: 'symbolImage_0', maxCount: 1 },
-  { name: 'symbolImage_1', maxCount: 1 },
-  { name: 'symbolImage_2', maxCount: 1 },
-  { name: 'symbolImage_3', maxCount: 1 },
-  { name: 'symbolImage_4', maxCount: 1 },
-  { name: 'symbolImage_5', maxCount: 1 },
-  { name: 'symbolImage_6', maxCount: 1 },
-  { name: 'symbolImage_7', maxCount: 1 },
-  { name: 'symbolImage_8', maxCount: 1 },
-  { name: 'symbolImage_9', maxCount: 1 },
-  { name: 'symbolImage_10', maxCount: 1 },
-  { name: 'symbolImage_11', maxCount: 1 },
-  { name: 'symbolImage_12', maxCount: 1 },
-  { name: 'symbolImage_13', maxCount: 1 },
-  { name: 'symbolImage_14', maxCount: 1 },
-  { name: 'symbolImage_15', maxCount: 1 },
-  { name: 'symbolImage_16', maxCount: 1 },
-  { name: 'symbolImage_17', maxCount: 1 },
-  { name: 'symbolImage_18', maxCount: 1 },
-  { name: 'symbolImage_19', maxCount: 1 },
-]), controller.create);
+router.post(
+  '/',
+  authenticate,
+  authRateLimiter,
+  uploadSvg.fields([
+    { name: 'svgFile', maxCount: 1 },
+    { name: 'symbolImage_0', maxCount: 1 },
+    { name: 'symbolImage_1', maxCount: 1 },
+    { name: 'symbolImage_2', maxCount: 1 },
+    { name: 'symbolImage_3', maxCount: 1 },
+    { name: 'symbolImage_4', maxCount: 1 },
+    { name: 'symbolImage_5', maxCount: 1 },
+    { name: 'symbolImage_6', maxCount: 1 },
+    { name: 'symbolImage_7', maxCount: 1 },
+    { name: 'symbolImage_8', maxCount: 1 },
+    { name: 'symbolImage_9', maxCount: 1 },
+    { name: 'symbolImage_10', maxCount: 1 },
+    { name: 'symbolImage_11', maxCount: 1 },
+    { name: 'symbolImage_12', maxCount: 1 },
+    { name: 'symbolImage_13', maxCount: 1 },
+    { name: 'symbolImage_14', maxCount: 1 },
+    { name: 'symbolImage_15', maxCount: 1 },
+    { name: 'symbolImage_16', maxCount: 1 },
+    { name: 'symbolImage_17', maxCount: 1 },
+    { name: 'symbolImage_18', maxCount: 1 },
+    { name: 'symbolImage_19', maxCount: 1 },
+  ]),
+  controller.create,
+);
 
 /**
  * @swagger
@@ -536,7 +563,7 @@ router.post('/', authenticate, authRateLimiter, uploadSvg.fields([
  *                 type: string
  *                 enum: ['cc0', 'cc-by', 'cc-by-sa']
  *                 default: cc-by
- *               
+ *
  *               # Step 2: Description (optional)
  *               summary:
  *                 type: string
@@ -588,7 +615,7 @@ router.post('/', authenticate, authRateLimiter, uploadSvg.fields([
  *                 type: string
  *                 description: Tableau JSON de mots-clés
  *                 example: '["royauté", "spiritualité", "bamoum", "tradition"]'
- *               
+ *
  *               # Step 3: Colors & Assets (optional)
  *               colors:
  *                 type: string
@@ -606,7 +633,7 @@ router.post('/', authenticate, authRateLimiter, uploadSvg.fields([
  *                 type: string
  *                 description: Tableau JSON de symboles constituants avec name, nameFr, meaning, usage, sacred, cssPreview, imageUrl (optionnel)
  *                 example: '[{"name": "Sankofa", "nameFr": "Sankofa", "cssPreview": "#D4A017", "meaning": "Retour aux sources", "usage": "spirituel", "sacred": false, "imageUrl": "https://cdn.avs-standard.com/symbols/sankofa.png"}]'
- *               
+ *
  *               # File upload (optional)
  *               svgFile:
  *                 type: string
@@ -632,29 +659,35 @@ router.post('/', authenticate, authRateLimiter, uploadSvg.fields([
  *       422:
  *         $ref: '#/components/responses/ValidationError'
  */
-router.patch('/:id', authenticate, authRateLimiter, uploadSvg.fields([
-  { name: 'svgFile', maxCount: 1 },
-  { name: 'symbolImage_0', maxCount: 1 },
-  { name: 'symbolImage_1', maxCount: 1 },
-  { name: 'symbolImage_2', maxCount: 1 },
-  { name: 'symbolImage_3', maxCount: 1 },
-  { name: 'symbolImage_4', maxCount: 1 },
-  { name: 'symbolImage_5', maxCount: 1 },
-  { name: 'symbolImage_6', maxCount: 1 },
-  { name: 'symbolImage_7', maxCount: 1 },
-  { name: 'symbolImage_8', maxCount: 1 },
-  { name: 'symbolImage_9', maxCount: 1 },
-  { name: 'symbolImage_10', maxCount: 1 },
-  { name: 'symbolImage_11', maxCount: 1 },
-  { name: 'symbolImage_12', maxCount: 1 },
-  { name: 'symbolImage_13', maxCount: 1 },
-  { name: 'symbolImage_14', maxCount: 1 },
-  { name: 'symbolImage_15', maxCount: 1 },
-  { name: 'symbolImage_16', maxCount: 1 },
-  { name: 'symbolImage_17', maxCount: 1 },
-  { name: 'symbolImage_18', maxCount: 1 },
-  { name: 'symbolImage_19', maxCount: 1 },
-]), controller.update);
+router.patch(
+  '/:id',
+  authenticate,
+  authRateLimiter,
+  uploadSvg.fields([
+    { name: 'svgFile', maxCount: 1 },
+    { name: 'symbolImage_0', maxCount: 1 },
+    { name: 'symbolImage_1', maxCount: 1 },
+    { name: 'symbolImage_2', maxCount: 1 },
+    { name: 'symbolImage_3', maxCount: 1 },
+    { name: 'symbolImage_4', maxCount: 1 },
+    { name: 'symbolImage_5', maxCount: 1 },
+    { name: 'symbolImage_6', maxCount: 1 },
+    { name: 'symbolImage_7', maxCount: 1 },
+    { name: 'symbolImage_8', maxCount: 1 },
+    { name: 'symbolImage_9', maxCount: 1 },
+    { name: 'symbolImage_10', maxCount: 1 },
+    { name: 'symbolImage_11', maxCount: 1 },
+    { name: 'symbolImage_12', maxCount: 1 },
+    { name: 'symbolImage_13', maxCount: 1 },
+    { name: 'symbolImage_14', maxCount: 1 },
+    { name: 'symbolImage_15', maxCount: 1 },
+    { name: 'symbolImage_16', maxCount: 1 },
+    { name: 'symbolImage_17', maxCount: 1 },
+    { name: 'symbolImage_18', maxCount: 1 },
+    { name: 'symbolImage_19', maxCount: 1 },
+  ]),
+  controller.update,
+);
 
 /**
  * @swagger

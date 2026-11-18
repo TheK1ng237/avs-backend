@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { AppError } from '../errors/AppError';
 import { logger } from '../utils/logger';
 import { StatusCodes } from 'http-status-codes';
+import multer from 'multer';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const errorFilter: ErrorRequestHandler = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
@@ -14,6 +15,17 @@ export const errorFilter: ErrorRequestHandler = (err: unknown, req: Request, res
       message: 'Données invalides',
       code:    'VALIDATION_ERROR',
       details: err.flatten().fieldErrors,
+      requestId,
+    });
+  }
+
+  if (err instanceof multer.MulterError) {
+    const isSizeLimit = err.code === 'LIMIT_FILE_SIZE';
+    const statusCode = isSizeLimit ? StatusCodes.PAYLOAD_TOO_LARGE : StatusCodes.BAD_REQUEST;
+    return res.status(statusCode).json({
+      success: false,
+      message: isSizeLimit ? 'L’image dépasse la taille maximale de 5 Mo.' : 'Fichier envoyé invalide.',
+      code: isSizeLimit ? 'UPLOAD_TOO_LARGE' : 'INVALID_UPLOAD',
       requestId,
     });
   }

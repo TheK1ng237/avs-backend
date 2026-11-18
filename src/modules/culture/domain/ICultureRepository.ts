@@ -9,17 +9,17 @@
 import type { CulturePattern, PatternType, Origin, Symbol } from './CulturePattern';
 
 export interface FindPatternsOptions {
-  page?:         number;
-  perPage?:      number;
-  region?:       Origin;
-  patternType?:  PatternType;
-  search?:       string;
-  onlyPublished?:boolean;
-  createdById?:  string;
+  page?: number;
+  perPage?: number;
+  region?: Origin;
+  patternType?: PatternType;
+  search?: string;
+  onlyPublished?: boolean;
+  createdById?: string;
 }
 
 export interface FindResult<T> {
-  items:      T[];
+  items: T[];
   totalItems: number;
 }
 
@@ -51,6 +51,7 @@ export interface CreateSymbolData {
   nameFr: string;
   cssPreview: string;
   imageUrl: string;
+  imageKey?: string | null;
   meaning: string;
   usage: string;
   sacred: boolean;

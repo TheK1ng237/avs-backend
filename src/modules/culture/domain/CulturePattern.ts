@@ -4,57 +4,66 @@
 // Équivalent Java : @Entity + Domain Object Pattern
 // =============================================================================
 
-export type PatternType = 'KENTE' | 'BOGOLAN' | 'ADINKRA' | 'NDEBELE' | 'KUBA' | 'NDOP' | 'WAX' | 'BERBER';
+export type PatternType =
+  | 'KENTE'
+  | 'BOGOLAN'
+  | 'ADINKRA'
+  | 'NDEBELE'
+  | 'KUBA'
+  | 'NDOP'
+  | 'WAX'
+  | 'BERBER';
 export type PatternFormat = 'SVG' | 'CSS' | 'HYBRID';
 export type Status = 'DRAFT' | 'PUBLISHED' | 'REVIEW' | 'REJECTED';
 
 // ── Interfaces des relations ───────────────────────────────────────────────────
 
 export interface Origin {
-  id:        string;
-  people:    string;
-  region:    string;
-  country:   string;
-  flag:      string;
-  coords:    number[];
+  id: string;
+  people: string;
+  region: string;
+  country: string;
+  flag: string;
+  coords: number[];
   patternId: string;
 }
 
 export interface PatternColor {
-  id:        string;
-  hex:       string;
-  name:      string;
-  meaning:   string;
+  id: string;
+  hex: string;
+  name: string;
+  meaning: string;
   patternId: string;
 }
 
 export interface Symbol {
-  id:         string;
-  name:       string;
-  nameFr:     string;
+  id: string;
+  name: string;
+  nameFr: string;
   cssPreview: string;
-  imageUrl:   string;
-  meaning:    string;
-  usage:      string;
-  sacred:     boolean;
-  patternId:  string;
+  imageUrl: string;
+  imageKey?: string | null;
+  meaning: string;
+  usage: string;
+  sacred: boolean;
+  patternId: string;
 }
 
 export interface ArtisanQuote {
-  id:        string;
-  text:      string;
-  author:    string;
-  role:      string;
-  country:   string;
+  id: string;
+  text: string;
+  author: string;
+  role: string;
+  country: string;
   patternId: string;
 }
 
 export interface Comment {
-  id:        string;
-  content:   string;
-  rating?:   number;
-  userId:    string;
-  verified:  boolean;
+  id: string;
+  content: string;
+  rating?: number;
+  userId: string;
+  verified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,54 +72,54 @@ export interface Comment {
 
 export interface CulturePatternProps {
   // ── Identité ──────────────────────────────────────
-  id:        string;
-  slug:      string;
-  name:      string | null;
+  id: string;
+  slug: string;
+  name: string | null;
   nameLocal: string;
-  imgUrl:    string | null;
-  createdById:string;
+  imgUrl: string | null;
+  createdById: string;
 
   // ── Classification ────────────────────────────────
-  type:       PatternType;
-  format?:    PatternFormat;
-  cssClass:   string;
-  cssCode?:   string | null;
-  svgContent?:string | null;
-  era:        string | null;
-  license:    string | null;
+  type: PatternType;
+  format?: PatternFormat;
+  cssClass: string;
+  cssCode?: string | null;
+  svgContent?: string | null;
+  era: string | null;
+  license: string | null;
 
   // ── Contenu textuel ───────────────────────────────
-  summary:    string;
-  history:    string;
-  technique:  string;
-  symbolism:  Symbolism;
+  summary: string;
+  history: string;
+  technique: string;
+  symbolism: Symbolism;
   ceremonial: string;
-  sources:    string[];
+  sources: string[];
 
   // ── Stats ─────────────────────────────────────────
   downloads: number;
-  views:     number;
+  views: number;
 
   // ── Flags ─────────────────────────────────────────
   status: Status;
-  isFeatured:  boolean;
+  isFeatured: boolean;
 
   // ── Relations ─────────────────────────────────────
-  origin?:       Origin;
-  colors?:       PatternColor[];
-  symbols?:      Symbol[];
+  origin?: Origin;
+  colors?: PatternColor[];
+  symbols?: Symbol[];
   artisanQuote?: ArtisanQuote;
-  comments?:     Comment[];
+  comments?: Comment[];
 
   // ── Timestamps ────────────────────────────────────
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface Symbolism{
+export interface Symbolism {
   meaning: string;
   keywords: string[];
-  usage: string
+  usage: string;
 }
 
 // ── Entité domaine ─────────────────────────────────────────────────────────────
@@ -131,42 +140,102 @@ export class CulturePattern {
 
   // ── Accesseurs (immutabilité) ──────────────────────────────────────────────
 
-  get id():          string          { return this.props.id; }
-  get slug():        string          { return this.props.slug; }
-  get name():        string | null   { return this.props.name; }
-  get nameLocal():   string          { return this.props.nameLocal; }
-  get imgUrl():      string | null   { return this.props.imgUrl; }
-  get createdById(): string          { return this.props.createdById; }
+  get id(): string {
+    return this.props.id;
+  }
+  get slug(): string {
+    return this.props.slug;
+  }
+  get name(): string | null {
+    return this.props.name;
+  }
+  get nameLocal(): string {
+    return this.props.nameLocal;
+  }
+  get imgUrl(): string | null {
+    return this.props.imgUrl;
+  }
+  get createdById(): string {
+    return this.props.createdById;
+  }
 
-  get type():        PatternType     { return this.props.type; }
-  get format():      PatternFormat   { return this.props.format || 'CSS'; }
-  get cssClass():    string          { return this.props.cssClass; }
-  get cssCode():     string | null   { return this.props.cssCode ?? null; }
-  get svgContent():  string | null   { return this.props.svgContent ?? null; }
-  get era():         string | null   { return this.props.era; }
-  get license():     string | null   { return this.props.license; }
+  get type(): PatternType {
+    return this.props.type;
+  }
+  get format(): PatternFormat {
+    return this.props.format || 'CSS';
+  }
+  get cssClass(): string {
+    return this.props.cssClass;
+  }
+  get cssCode(): string | null {
+    return this.props.cssCode ?? null;
+  }
+  get svgContent(): string | null {
+    return this.props.svgContent ?? null;
+  }
+  get era(): string | null {
+    return this.props.era;
+  }
+  get license(): string | null {
+    return this.props.license;
+  }
 
-  get summary():     string          { return this.props.summary; }
-  get history():     string          { return this.props.history; }
-  get technique():   string          { return this.props.technique; }
-  get symbolism():   Symbolism          { return this.props.symbolism; }
-  get ceremonial():  string          { return this.props.ceremonial; }
-  get sources():     string[]        { return [...this.props.sources]; }
+  get summary(): string {
+    return this.props.summary;
+  }
+  get history(): string {
+    return this.props.history;
+  }
+  get technique(): string {
+    return this.props.technique;
+  }
+  get symbolism(): Symbolism {
+    return this.props.symbolism;
+  }
+  get ceremonial(): string {
+    return this.props.ceremonial;
+  }
+  get sources(): string[] {
+    return [...this.props.sources];
+  }
 
-  get downloads():   number          { return this.props.downloads; }
-  get views():       number          { return this.props.views; }
+  get downloads(): number {
+    return this.props.downloads;
+  }
+  get views(): number {
+    return this.props.views;
+  }
 
-  get status(): Status         { return this.props.status; }
-  get isFeatured():  boolean         { return this.props.isFeatured; }
+  get status(): Status {
+    return this.props.status;
+  }
+  get isFeatured(): boolean {
+    return this.props.isFeatured;
+  }
 
-  get origin():       Origin | undefined       { return this.props.origin; }
-  get colors():       PatternColor[] | undefined { return this.props.colors; }
-  get symbols():      Symbol[] | undefined     { return this.props.symbols; }
-  get artisanQuote(): ArtisanQuote | undefined { return this.props.artisanQuote; }
-  get comments():     Comment[] | undefined    { return this.props.comments; }
+  get origin(): Origin | undefined {
+    return this.props.origin;
+  }
+  get colors(): PatternColor[] | undefined {
+    return this.props.colors;
+  }
+  get symbols(): Symbol[] | undefined {
+    return this.props.symbols;
+  }
+  get artisanQuote(): ArtisanQuote | undefined {
+    return this.props.artisanQuote;
+  }
+  get comments(): Comment[] | undefined {
+    return this.props.comments;
+  }
 
-  get createdAt():   Date            { return this.props.createdAt; }
-  get updatedAt():   Date            { return this.props.updatedAt; }
+  get createdAt(): Date {
+    return this.props.createdAt;
+  }
+  get updatedAt(): Date {
+    return this.props.updatedAt;
+  }
 
   // ── Comportements domaine ──────────────────────────────────────────────────
 
@@ -222,5 +291,7 @@ export class CulturePattern {
     return new CulturePattern({ ...this.props, status, updatedAt: new Date() });
   }
 
-  toObject(): CulturePatternProps { return { ...this.props }; }
+  toObject(): CulturePatternProps {
+    return { ...this.props };
+  }
 }

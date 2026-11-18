@@ -132,6 +132,7 @@ model Symbol {
   nameFr     String
   cssPreview String
   imageUrl   String
+  imageKey   String?
   meaning    String
   usage      String
   sacred     Boolean @default(false)
