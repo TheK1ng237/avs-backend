@@ -49,6 +49,38 @@ export const authenticate: RequestHandler = (req, _res, next) => {
   }
 };
 
+export const optionalAuthenticate: RequestHandler = (req, _res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+
+  if (!token) {
+    next();
+    return;
+  }
+
+  try {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET non configuré');
+    }
+
+    const payload = jwt.verify(token, secret) as JwtPayload;
+    if (payload.tokenType !== 'access') {
+      throw new UnauthorizedError('Type de token invalide');
+    }
+    req.user = payload;
+    next();
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      next(new UnauthorizedError('Token expiré'));
+    } else if (err instanceof jwt.JsonWebTokenError) {
+      next(new UnauthorizedError('Token invalide'));
+    } else {
+      next(err);
+    }
+  }
+};
+
 // ── Guard par rôle ────────────────────────────────────────────────────────────
 export const requireRole = (...roles: (JwtPayload['role'] | string)[]): RequestHandler =>
   (req, _res, next) => {

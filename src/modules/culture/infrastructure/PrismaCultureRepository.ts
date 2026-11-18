@@ -8,8 +8,16 @@
 // =============================================================================
 
 import type { PrismaClient, Prisma } from '@prisma/client';
-import type { ICultureRepository, FindPatternsOptions, FindResult } from '../domain/ICultureRepository';
-import { CulturePattern, type PatternType, type PatternFormat } from '../domain/CulturePattern';
+import type {
+  ICultureRepository,
+  FindPatternsOptions,
+  FindResult,
+  FindSymbolsOptions,
+  SymbolEntry,
+  CreateSymbolData,
+  UpdateSymbolData,
+} from '../domain/ICultureRepository';
+import { CulturePattern, type PatternType, type PatternFormat, type Symbol } from '../domain/CulturePattern';
 
 export class PrismaCultureRepository implements ICultureRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -204,6 +212,71 @@ export class PrismaCultureRepository implements ICultureRepository {
   async exists(slug: string): Promise<boolean> {
     const count = await this.prisma.pattern.count({ where: { slug } });
     return count > 0;
+  }
+
+  async findSymbols(options: FindSymbolsOptions): Promise<SymbolEntry[]> {
+    const rows = await this.prisma.symbol.findMany({
+      where: {
+        ...(options.onlyPublished && { pattern: { status: 'PUBLISHED' } }),
+        ...(options.createdById && { pattern: { createdById: options.createdById } }),
+      },
+      include: {
+        pattern: {
+          include: { origin: true },
+        },
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      nameFr: row.nameFr,
+      cssPreview: row.cssPreview,
+      imageUrl: row.imageUrl,
+      meaning: row.meaning,
+      usage: row.usage,
+      sacred: row.sacred,
+      patternId: row.patternId,
+      pattern: {
+        id: row.pattern.id,
+        slug: row.pattern.slug,
+        name: row.pattern.name,
+        nameLocal: row.pattern.nameLocal,
+        type: row.pattern.type as PatternType,
+        status: row.pattern.status,
+        sources: row.pattern.sources,
+        origin: row.pattern.origin
+          ? {
+              people: row.pattern.origin.people,
+              region: row.pattern.origin.region,
+              country: row.pattern.origin.country,
+              flag: row.pattern.origin.flag,
+            }
+          : null,
+      },
+    }));
+  }
+
+  async findSymbolById(id: string): Promise<Symbol | null> {
+    return this.prisma.symbol.findUnique({ where: { id } });
+  }
+
+  async createSymbol(patternId: string, data: CreateSymbolData): Promise<Symbol> {
+    return this.prisma.symbol.create({
+      data: {
+        ...data,
+        pattern: { connect: { id: patternId } },
+      },
+    });
+  }
+
+  async updateSymbol(id: string, data: UpdateSymbolData): Promise<Symbol> {
+    return this.prisma.symbol.update({ where: { id }, data });
+  }
+
+  async deleteSymbol(id: string): Promise<void> {
+    await this.prisma.symbol.delete({ where: { id } });
   }
 
   // ── Mappers Domain ↔ Persistence ─────────────────────────────────────────

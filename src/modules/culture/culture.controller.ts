@@ -174,11 +174,103 @@ const QuerySchema = z.object({
   search: z.string().max(128).optional(),
 });
 
+const CreateSymbolSchema = z.object({
+  name: z.string().trim().min(2).max(128),
+  nameFr: z.string().trim().min(2).max(128),
+  cssPreview: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  imageUrl: z.union([z.string().url(), z.literal('')]).default(''),
+  meaning: z.string().trim().min(10).max(2000),
+  usage: z.string().trim().min(3).max(1000),
+  sacred: z.boolean().default(false),
+});
+
+const UpdateSymbolSchema = CreateSymbolSchema.partial().refine(
+  (data) => Object.keys(data).length > 0,
+  'Au moins un champ doit être renseigné',
+);
+
 // ── Factory — injection du service ───────────────────────────────────────────
 export class CultureController {
   constructor(private readonly service: CultureService) {}
 
   private storage = createStorageService();
+
+  listSymbols = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const symbols = await this.service.listSymbols(req.user?.userId, req.user?.role);
+      res.json(ok(symbols, 'Symboles récupérés avec succès'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createSymbol = async (
+    req: Request<{ patternId: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const data = CreateSymbolSchema.parse(req.body);
+      const symbol = await this.service.createSymbol(
+        req.params.patternId,
+        data,
+        req.user?.role ?? '',
+      );
+      res.status(StatusCodes.CREATED).json(ok(symbol, 'Symbole créé avec succès'));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+          success: false,
+          message: 'Validation failed',
+          errors: err.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        });
+        return;
+      }
+      next(err);
+    }
+  };
+
+  updateSymbol = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const data = UpdateSymbolSchema.parse(req.body);
+      const symbol = await this.service.updateSymbol(req.params.id, data, req.user?.role ?? '');
+      res.json(ok(symbol, 'Symbole mis à jour avec succès'));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+          success: false,
+          message: 'Validation failed',
+          errors: err.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        });
+        return;
+      }
+      next(err);
+    }
+  };
+
+  removeSymbol = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      await this.service.deleteSymbol(req.params.id, req.user?.role ?? '');
+      res.status(StatusCodes.NO_CONTENT).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { page = '1', perPage = '20', search } = req.query as Record<string, string | undefined>;

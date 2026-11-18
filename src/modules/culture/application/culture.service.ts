@@ -9,8 +9,15 @@
 // =============================================================================
 
 import { randomUUID } from 'crypto';
-import { CulturePattern, Symbolism, type CulturePatternProps, type PatternType } from '../domain/CulturePattern';
-import type { ICultureRepository, FindPatternsOptions } from '../domain/ICultureRepository';
+import { CulturePattern, Symbolism, type CulturePatternProps, type PatternType, type Symbol } from '../domain/CulturePattern';
+import type {
+  ICultureRepository,
+  FindPatternsOptions,
+  FindSymbolsOptions,
+  CreateSymbolData,
+  UpdateSymbolData,
+  SymbolEntry,
+} from '../domain/ICultureRepository';
 import type { PaginationMeta } from '@/shared/types/api.types';
 import { NotFoundError, ConflictError, ForbiddenError } from '@/shared/errors/AppError';
 import { buildMeta, parsePagination } from '@/shared/utils/pagination';
@@ -53,6 +60,10 @@ export interface PatternListResult {
   items: CulturePattern[];
   meta:  PaginationMeta;
 }
+
+export interface CreateCultureSymbolDto extends CreateSymbolData {}
+
+export interface UpdateCultureSymbolDto extends UpdateSymbolData {}
 
 // ── Service ───────────────────────────────────────────────────────────────────
 export class CultureService {
@@ -217,6 +228,60 @@ export class CultureService {
     if (!pattern) { throw new NotFoundError(`Motif #${id}`); }
 
     await this.repository.delete(id);
+  }
+
+  async listSymbols(requesterId?: string, requesterRole?: string): Promise<SymbolEntry[]> {
+    const role = this.normalizeRole(requesterRole);
+    const options: FindSymbolsOptions = {
+      onlyPublished: !role || role === 'viewer',
+      ...(role === 'contributor' || role === 'curator' ? { createdById: requesterId } : {}),
+    };
+
+    return this.repository.findSymbols(options);
+  }
+
+  async createSymbol(
+    patternId: string,
+    dto: CreateCultureSymbolDto,
+    requesterRole: string,
+  ): Promise<Symbol> {
+    if (!this.isCuratorOrAdmin(requesterRole)) {
+      throw new ForbiddenError('Seuls les curateurs et administrateurs peuvent créer un symbole');
+    }
+
+    if (!(await this.repository.findById(patternId))) {
+      throw new NotFoundError(`Motif #${patternId}`);
+    }
+
+    return this.repository.createSymbol(patternId, dto);
+  }
+
+  async updateSymbol(
+    id: string,
+    dto: UpdateCultureSymbolDto,
+    requesterRole: string,
+  ): Promise<Symbol> {
+    if (!this.isCuratorOrAdmin(requesterRole)) {
+      throw new ForbiddenError('Seuls les curateurs et administrateurs peuvent modifier un symbole');
+    }
+
+    if (!(await this.repository.findSymbolById(id))) {
+      throw new NotFoundError(`Symbole #${id}`);
+    }
+
+    return this.repository.updateSymbol(id, dto);
+  }
+
+  async deleteSymbol(id: string, requesterRole: string): Promise<void> {
+    if (!this.isCuratorOrAdmin(requesterRole)) {
+      throw new ForbiddenError('Seuls les curateurs et administrateurs peuvent supprimer un symbole');
+    }
+
+    if (!(await this.repository.findSymbolById(id))) {
+      throw new NotFoundError(`Symbole #${id}`);
+    }
+
+    await this.repository.deleteSymbol(id);
   }
 
   // ── Utilitaires de rôle ───────────────────────────────────────────────────

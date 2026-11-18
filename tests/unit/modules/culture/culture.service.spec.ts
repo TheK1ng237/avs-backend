@@ -1,31 +1,51 @@
-import { CultureService } from '@/modules/culture/application/culture.service';
-import type { ICultureRepository, FindResult } from '@/modules/culture/domain/ICultureRepository';
-import { CulturePattern } from '@/modules/culture/domain/CulturePattern';
-import { NotFoundError, ConflictError } from '@/shared/errors/AppError';
+import { CultureService, type CreatePatternDto } from '@/modules/culture/application/culture.service';
+import type { ICultureRepository } from '@/modules/culture/domain/ICultureRepository';
+import { CulturePattern, type CulturePatternProps } from '@/modules/culture/domain/CulturePattern';
+import { ConflictError, NotFoundError } from '@/shared/errors/AppError';
 
-// ── Mock Repository ───────────────────────────────────────────────────────────
 const mockRepo: jest.Mocked<ICultureRepository> = {
-  findById:    jest.fn(),
-  findBySlug:  jest.fn(),
-  findMany:    jest.fn(),
-  save:        jest.fn(),
-  update:      jest.fn(),
-  delete:      jest.fn(),
-  exists:      jest.fn(),
+  findById: jest.fn(),
+  findBySlug: jest.fn(),
+  findMany: jest.fn(),
+  save: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  exists: jest.fn(),
+  findSymbols: jest.fn(),
+  findSymbolById: jest.fn(),
+  createSymbol: jest.fn(),
+  updateSymbol: jest.fn(),
+  deleteSymbol: jest.fn(),
 };
 
 const service = new CultureService(mockRepo);
 
-const makePattern = (overrides = {}): CulturePattern =>
+const makePattern = (overrides: Partial<CulturePatternProps> = {}): CulturePattern =>
   CulturePattern.create({
-    id: 'test-uuid', slug: 'test-slug',
-    nameFr: 'Test', nameEn: 'Test',
-    descFr: 'Description FR', descEn: 'Description EN',
-    patternType: 'kente', region: 'west-africa', country: 'GH',
-    colors: { primary: '#C0573E', secondary: '#F5EBE0' },
-    symbolism: { meaning: 'Royauté', keywords: ['test'], usage: 'ceremonial' },
-    isPublished: true, isFeatured: false, viewCount: 0,
-    createdAt: new Date(), updatedAt: new Date(), createdById: 'user-1',
+    id: 'pattern-1',
+    slug: 'test-pattern',
+    name: 'Test Pattern',
+    nameLocal: 'Test Pattern',
+    imgUrl: '',
+    createdById: 'user-1',
+    type: 'KENTE',
+    cssClass: 'kente',
+    era: null,
+    license: 'cc-by',
+    summary: 'A documented pattern with sufficient description.',
+    history: 'A documented history with sufficient details.',
+    technique: 'A documented technique with sufficient details.',
+    symbolism: { meaning: 'A documented meaning.', keywords: ['heritage'], usage: 'daily' },
+    ceremonial: 'A documented use with sufficient details.',
+    sources: [],
+    downloads: 0,
+    views: 0,
+    status: 'DRAFT',
+    isFeatured: false,
+    colors: [],
+    symbols: [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   });
 
@@ -33,35 +53,42 @@ describe('CultureService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('getPatternBySlug', () => {
-    it('retourne le motif et incrémente les vues', async () => {
-      const pattern = makePattern();
-      mockRepo.findBySlug.mockResolvedValue(pattern);
-      mockRepo.update.mockImplementation(p => Promise.resolve(p));
+    it('returns the pattern and increments its view count', async () => {
+      mockRepo.findBySlug.mockResolvedValue(makePattern());
+      mockRepo.update.mockImplementation(async (pattern) => pattern);
 
-      const result = await service.getPatternBySlug('test-slug');
+      const result = await service.getPatternBySlug('test-pattern');
 
-      expect(mockRepo.findBySlug).toHaveBeenCalledWith('test-slug');
+      expect(mockRepo.findBySlug).toHaveBeenCalledWith('test-pattern');
       expect(mockRepo.update).toHaveBeenCalled();
-      expect(result.viewCount).toBe(1);
+      expect(result.views).toBe(1);
     });
 
-    it('lève NotFoundError si le motif est absent', async () => {
+    it('throws NotFoundError when the pattern does not exist', async () => {
       mockRepo.findBySlug.mockResolvedValue(null);
-      await expect(service.getPatternBySlug('inconnu')).rejects.toThrow(NotFoundError);
+
+      await expect(service.getPatternBySlug('missing')).rejects.toThrow(NotFoundError);
     });
   });
 
   describe('createPattern', () => {
-    it('lève ConflictError si le slug existe déjà', async () => {
+    it('throws ConflictError when the generated slug already exists', async () => {
       mockRepo.exists.mockResolvedValue(true);
-      await expect(service.createPattern({
-        nameFr: 'Kente', nameEn: 'Kente',
-        descFr: 'Desc', descEn: 'Desc',
-        patternType: 'kente', region: 'west-africa', country: 'GH',
-        colors: { primary: '#C0573E', secondary: '#F5EBE0' },
-        symbolism: { meaning: 'Royauté', keywords: ['kente'], usage: 'ceremonial' },
-        createdById: 'user-1',
-      })).rejects.toThrow(ConflictError);
+      const dto: CreatePatternDto = {
+        name: 'Kente',
+        nameLocal: 'Kente Royal',
+        imgUrl: '',
+        type: 'KENTE',
+        cssClass: 'kente',
+        summary: 'A documented pattern with sufficient description.',
+        history: 'A documented history with sufficient details.',
+        technique: 'A documented technique with sufficient details.',
+        symbolism: { meaning: 'A documented meaning.', keywords: ['heritage'], usage: 'daily' },
+        ceremonial: 'A documented use with sufficient details.',
+      };
+
+      await expect(service.createPattern(dto)).rejects.toThrow(ConflictError);
+      expect(mockRepo.exists).toHaveBeenCalledWith('kente-royal');
     });
   });
 });

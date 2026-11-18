@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { CultureController, uploadSvg } from './culture.controller';
 import { CultureService }    from './application/culture.service';
 import { PrismaCultureRepository } from './infrastructure/PrismaCultureRepository';
-import { authenticate, requireCurator, requireAdmin } from '@/shared/middlewares/auth.middleware';
+import { authenticate, optionalAuthenticate, requireCurator, requireAdmin } from '@/shared/middlewares/auth.middleware';
 import { publicApiRateLimiter, authRateLimiter } from '@/shared/middlewares/security.middleware';
 import { db } from '@/infra/database/database';
 
@@ -12,6 +12,97 @@ const router = Router();
 const repository  = new PrismaCultureRepository(db);
 const service     = new CultureService(repository);
 const controller  = new CultureController(service);
+
+/**
+ * @swagger
+ * /api/v1/patterns/symbols:
+ *   get:
+ *     summary: Lister les symboles culturels
+ *     tags: [Symbols]
+ *     description: Retourne les symboles des motifs publiés. Les curateurs voient également les fiches liées à leurs motifs et les administrateurs voient l'ensemble du catalogue.
+ *     responses:
+ *       200:
+ *         description: Liste des symboles et contexte du motif associé
+ */
+router.get('/symbols', optionalAuthenticate, publicApiRateLimiter, controller.listSymbols);
+
+/**
+ * @swagger
+ * /api/v1/patterns/{patternId}/symbols:
+ *   post:
+ *     summary: Ajouter un symbole à un motif
+ *     tags: [Symbols]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patternId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, nameFr, cssPreview, meaning, usage]
+ *             properties:
+ *               name: { type: string, maxLength: 128 }
+ *               nameFr: { type: string, maxLength: 128 }
+ *               cssPreview: { type: string, example: '#D4A017' }
+ *               imageUrl: { type: string, format: uri }
+ *               meaning: { type: string, maxLength: 2000 }
+ *               usage: { type: string, maxLength: 1000 }
+ *               sacred: { type: boolean }
+ *     responses:
+ *       201:
+ *         description: Symbole créé
+ *       403:
+ *         description: Rôle curateur ou administrateur requis
+ */
+router.post('/:patternId/symbols', authenticate, requireCurator, controller.createSymbol);
+
+/**
+ * @swagger
+ * /api/v1/patterns/symbols/{id}:
+ *   patch:
+ *     summary: Modifier un symbole
+ *     tags: [Symbols]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Symbole mis à jour
+ *       403:
+ *         description: Rôle curateur ou administrateur requis
+ */
+router.patch('/symbols/:id', authenticate, requireCurator, controller.updateSymbol);
+
+/**
+ * @swagger
+ * /api/v1/patterns/symbols/{id}:
+ *   delete:
+ *     summary: Supprimer un symbole
+ *     tags: [Symbols]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       204:
+ *         description: Symbole supprimé
+ *       403:
+ *         description: Rôle curateur ou administrateur requis
+ */
+router.delete('/symbols/:id', authenticate, requireCurator, controller.removeSymbol);
 
 /**
  * @swagger
