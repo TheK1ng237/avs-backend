@@ -59,11 +59,23 @@ export class ActivityService {
 
   async getGlobalStats(): Promise<{
     totalPatterns: number;
-    totalUsers: number;
     totalArtisans: number;
     totalDownloads: number;
+    totalViews: number;
+    totalCountries: number;
+    totalSymbols: number;
   }> {
     return this.repository.getGlobalStats();
+  }
+
+  async getUserStats(userId: string): Promise<{
+    total: number;
+    downloads: number;
+    favorites: number;
+    comments: number;
+    reviews: number;
+  }> {
+    return this.repository.getUserStats(userId);
   }
 
   async getGlobalActivity(params?: { skip?: number; take?: number }): Promise<Activity[]> {

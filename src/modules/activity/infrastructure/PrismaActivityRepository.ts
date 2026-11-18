@@ -26,24 +26,61 @@ export class PrismaActivityRepository {
 
   async getGlobalStats(): Promise<{
     totalPatterns: number;
-    totalUsers: number;
     totalArtisans: number;
     totalDownloads: number;
+    totalViews: number;
+    totalCountries: number;
+    totalSymbols: number;
   }> {
-    const [totalPatterns, totalUsers, totalArtisans, stats] = await Promise.all([
-      this.db.pattern.count(),
-      this.db.user.count(),
-      this.db.artisan.count(),
+    const publishedPatternWhere = { status: 'PUBLISHED' as const };
+    const [totalPatterns, totalArtisans, stats, totalCountries, totalSymbols] = await Promise.all([
+      this.db.pattern.count({ where: publishedPatternWhere }),
+      this.db.artisan.count({ where: { verified: true } }),
       this.db.pattern.aggregate({
-        _sum: { downloads: true },
+        where: publishedPatternWhere,
+        _sum: { downloads: true, views: true },
       }),
+      this.db.origin.findMany({
+        where: { pattern: publishedPatternWhere },
+        distinct: ['country'],
+        select: { country: true },
+      }),
+      this.db.symbol.count({ where: { pattern: publishedPatternWhere } }),
     ]);
 
     return {
       totalPatterns,
-      totalUsers,
       totalArtisans,
       totalDownloads: stats._sum?.downloads ?? 0,
+      totalViews: stats._sum?.views ?? 0,
+      totalCountries: totalCountries.length,
+      totalSymbols,
+    };
+  }
+
+  async getUserStats(userId: string): Promise<{
+    total: number;
+    downloads: number;
+    favorites: number;
+    comments: number;
+    reviews: number;
+  }> {
+    const [total, actions] = await Promise.all([
+      this.db.activity.count({ where: { userId } }),
+      this.db.activity.groupBy({
+        by: ['action'],
+        where: { userId },
+        _count: true,
+      }),
+    ]);
+
+    const counts = new Map(actions.map(({ action, _count }) => [action, _count]));
+    return {
+      total,
+      downloads: counts.get('DOWNLOADED') ?? 0,
+      favorites: counts.get('FAVORITED') ?? 0,
+      comments: counts.get('COMMENTED') ?? 0,
+      reviews: counts.get('REVIEWED') ?? 0,
     };
   }
 

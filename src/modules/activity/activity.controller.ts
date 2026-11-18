@@ -38,6 +38,21 @@ export class ActivityController {
     }
   };
 
+  getUserStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(StatusCodes.UNAUTHORIZED).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      const stats = await this.service.getUserStats(userId);
+      res.json(ok(stats, 'User activity statistics'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getGlobalActivity = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const query = QuerySchema.parse(req.query);

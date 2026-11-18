@@ -20,7 +20,7 @@ const controller = new CultureController(service);
 
 /**
  * @swagger
- * /api/v1/patterns/symbols:
+ * /api/v1/patterns/symbols/catalog:
  *   get:
  *     summary: Lister les symboles culturels
  *     tags: [Symbols]
@@ -29,6 +29,7 @@ const controller = new CultureController(service);
  *       200:
  *         description: Liste des symboles et contexte du motif associé
  */
+router.get('/symbols/catalog', optionalAuthenticate, publicApiRateLimiter, controller.listSymbols);
 router.get('/symbols', optionalAuthenticate, publicApiRateLimiter, controller.listSymbols);
 
 /**
@@ -190,7 +191,7 @@ router.delete('/symbols/:id', authenticate, requireCurator, controller.removeSym
  *           application/json:
  *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  */
-router.get('/', publicApiRateLimiter, controller.list);
+router.get('/', optionalAuthenticate, publicApiRateLimiter, controller.list);
 
 /**
  * @swagger

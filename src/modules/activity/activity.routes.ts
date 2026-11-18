@@ -15,6 +15,34 @@ const controller = new ActivityController(service);
 
 /**
  * @swagger
+ * /api/v1/activities/stats:
+ *   get:
+ *     summary: Get public platform totals from published records
+ *     tags: [Activities]
+ *     responses:
+ *       200:
+ *         description: Platform totals for patterns, countries, artisans, downloads, views and symbols
+ */
+router.get('/stats', publicApiRateLimiter, controller.getGlobalStats);
+
+/**
+ * @swagger
+ * /api/v1/activities/me/stats:
+ *   get:
+ *     summary: Get activity totals for the authenticated user
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User activity totals by type
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.get('/me/stats', authenticate, controller.getUserStats);
+
+/**
+ * @swagger
  * /api/v1/activities:
  *   get:
  *     summary: Get user activity feed

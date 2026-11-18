@@ -73,6 +73,11 @@ export interface UserStats {
   patternsCreated: number;
   totalViews: number;
   memberSince: string;
+  patternsByStatus: {
+    published: number;
+    draft: number;
+    review: number;
+  };
   downloadsTotal?: number;
   favoritesCount?: number;
   commentsCount?: number;
@@ -126,11 +131,16 @@ export class UserService {
     // Sum downloads and views from user's patterns
     const patterns = await this.db.pattern.findMany({
       where: { createdById: userId },
-      select: { downloads: true, views: true },
+      select: { downloads: true, views: true, status: true },
     });
 
     const downloadsTotal = patterns.reduce((sum, p) => sum + (p.downloads || 0), 0);
     const totalViews = patterns.reduce((sum, p) => sum + (p.views || 0), 0);
+    const patternsByStatus = {
+      published: patterns.filter((pattern) => pattern.status === 'PUBLISHED').length,
+      draft: patterns.filter((pattern) => pattern.status === 'DRAFT').length,
+      review: patterns.filter((pattern) => pattern.status === 'REVIEW').length,
+    };
 
     // Count comments by this user
     const commentsCount = await this.db.comment.count({
@@ -181,26 +191,6 @@ export class UserService {
       ? `${Math.round(((downloadsThisMonth - downloadsLastMonth) / downloadsLastMonth) * 100)}% vs mois dernier`
       : '+0% vs mois dernier';
 
-    // Views trend (using activity data)
-    const viewsThisMonth = await this.db.activity.count({
-      where: {
-        userId,
-        action: 'CREATED', // Assuming CREATED represents views for now
-        createdAt: { gte: currentMonthStart },
-      },
-    });
-
-    const viewsLastMonth = await this.db.activity.count({
-      where: {
-        userId,
-        action: 'CREATED',
-        createdAt: { gte: lastMonthStart, lt: lastMonthEnd },
-      },
-    });
-
-    const viewsDiff = viewsThisMonth - viewsLastMonth;
-    const viewsTrend = viewsDiff >= 0 ? `+${viewsDiff} ce mois` : `${viewsDiff} ce mois`;
-
     // Favorites trend
     const favoritesThisMonth = await this.db.activity.count({
       where: {
@@ -225,13 +215,14 @@ export class UserService {
       patternsCreated,
       totalViews,
       memberSince,
+      patternsByStatus,
       downloadsTotal,
       favoritesCount,
       commentsCount,
       trends: {
         patternsTrend,
         downloadsTrend,
-        viewsTrend,
+        viewsTrend: '—',
         favoritesTrend,
       },
     };
@@ -712,5 +703,4 @@ export class UserService {
     await this.repository.update(userId, { profilePublic: false });
   }
 }
-
 
