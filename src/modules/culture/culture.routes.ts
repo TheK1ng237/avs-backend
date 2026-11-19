@@ -255,7 +255,7 @@ router.get('/recent/global', authenticate, controller.getRecentGlobal);
  *         $ref: '#/components/responses/NotFound'
  */
 router.get('/:slug/share', publicApiRateLimiter, controller.getShareData);
-router.get('/:slug', publicApiRateLimiter, controller.getBySlug);
+router.get('/:slug', optionalAuthenticate, publicApiRateLimiter, controller.getBySlug);
 router.get('/:slug/stats', optionalAuthenticate, publicApiRateLimiter, controller.getStats);
 
 /**

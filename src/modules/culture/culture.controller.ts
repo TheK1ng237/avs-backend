@@ -434,7 +434,19 @@ export class CultureController {
       }
 
       if (pattern.status !== 'PUBLISHED') {
-        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        const requesterId = req.user?.userId;
+        const requesterRole = String(req.user?.role ?? '').toLowerCase();
+        const canInspectUnpublished =
+          requesterId === pattern.createdById ||
+          requesterRole === 'admin' ||
+          requesterRole === 'super_admin';
+
+        if (!canInspectUnpublished) {
+          res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+          return;
+        }
+
+        res.json(ok(PatternListResponseMapper.toPatternDoc(pattern)));
         return;
       }
 
