@@ -1,4 +1,7 @@
-import { CultureService, type CreatePatternDto } from '@/modules/culture/application/culture.service';
+import {
+  CultureService,
+  type CreatePatternDto,
+} from '@/modules/culture/application/culture.service';
 import type { ICultureRepository } from '@/modules/culture/domain/ICultureRepository';
 import { CulturePattern, type CulturePatternProps } from '@/modules/culture/domain/CulturePattern';
 import { ConflictError, NotFoundError } from '@/shared/errors/AppError';
@@ -6,6 +9,7 @@ import { ConflictError, NotFoundError } from '@/shared/errors/AppError';
 const mockRepo: jest.Mocked<ICultureRepository> = {
   findById: jest.fn(),
   findBySlug: jest.fn(),
+  findByIdOrSlug: jest.fn(),
   findMany: jest.fn(),
   save: jest.fn(),
   update: jest.fn(),
@@ -51,6 +55,26 @@ const makePattern = (overrides: Partial<CulturePatternProps> = {}): CulturePatte
 
 describe('CultureService', () => {
   beforeEach(() => jest.clearAllMocks());
+
+  describe('getPatternForDownload', () => {
+    it('resolves a pattern by database ID', async () => {
+      mockRepo.findByIdOrSlug.mockResolvedValue(makePattern());
+
+      const result = await service.getPatternForDownload('pattern-1');
+
+      expect(mockRepo.findByIdOrSlug).toHaveBeenCalledWith('pattern-1');
+      expect(result.id).toBe('pattern-1');
+    });
+
+    it('resolves a pattern by slug', async () => {
+      mockRepo.findByIdOrSlug.mockResolvedValue(makePattern());
+
+      const result = await service.getPatternForDownload('test-pattern');
+
+      expect(mockRepo.findByIdOrSlug).toHaveBeenCalledWith('test-pattern');
+      expect(result.slug).toBe('test-pattern');
+    });
+  });
 
   describe('getPatternBySlug', () => {
     it('returns the pattern and increments its view count', async () => {

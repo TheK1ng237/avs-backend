@@ -14,7 +14,7 @@ import { PatternListResponseMapper } from './dto/PatternListResponse.mapper';
 import { db } from '@/infra/database/database';
 import { generateVectorSvgFromCss } from './utils/svgExporter';
 import { isStaticPatternSlug, STATIC_PATTERN_EXPORTS } from './staticPatternRegistry';
-import { AppError } from '@/shared/errors/AppError';
+import { AppError, NotFoundError } from '@/shared/errors/AppError';
 
 // ── Multer configuration for SVG file upload ─────────────────────────────────────
 const storage = multer.diskStorage({
@@ -890,7 +890,14 @@ export class CultureController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      if (isStaticPatternSlug(req.params.id)) {
+      let pattern;
+      try {
+        pattern = await this.service.getPatternForDownload(req.params.id);
+      } catch (err) {
+        if (!(err instanceof NotFoundError) || !isStaticPatternSlug(req.params.id)) {
+          throw err;
+        }
+
         const staticPattern = STATIC_PATTERN_EXPORTS[req.params.id];
         const svgContent = generateVectorSvgFromCss({
           id: req.params.id,
@@ -912,7 +919,6 @@ export class CultureController {
         return;
       }
 
-      const pattern = await this.service.getPatternForDownload(req.params.id);
       if (pattern.status !== 'PUBLISHED') {
         res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
         return;
@@ -999,7 +1005,9 @@ export class CultureController {
             requesterRole === 'curator';
 
           if (!canInspectUnpublished) {
-            res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+            res
+              .status(StatusCodes.NOT_FOUND)
+              .json({ success: false, message: 'Pattern not found' });
             return;
           }
 
@@ -1056,7 +1064,9 @@ export class CultureController {
             requesterRole === 'curator';
 
           if (!canInspectUnpublished) {
-            res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+            res
+              .status(StatusCodes.NOT_FOUND)
+              .json({ success: false, message: 'Pattern not found' });
             return;
           }
         }

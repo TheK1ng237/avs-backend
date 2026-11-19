@@ -230,10 +230,10 @@ export class CultureService {
   }
 
   // ── Cas d'usage : récupérer un motif pour téléchargement ─────────────────────
-  async getPatternForDownload(id: string): Promise<CulturePattern> {
-    const pattern = await this.repository.findById(id);
+  async getPatternForDownload(idOrSlug: string): Promise<CulturePattern> {
+    const pattern = await this.repository.findByIdOrSlug(idOrSlug);
     if (!pattern) {
-      throw new NotFoundError(`Motif #${id}`);
+      throw new NotFoundError(`Motif #${idOrSlug}`);
     }
     return pattern;
   }

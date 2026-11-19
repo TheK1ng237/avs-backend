@@ -63,6 +63,7 @@ export type UpdateSymbolData = Partial<CreateSymbolData>;
 export interface ICultureRepository {
   findById(id: string): Promise<CulturePattern | null>;
   findBySlug(slug: string): Promise<CulturePattern | null>;
+  findByIdOrSlug(identifier: string): Promise<CulturePattern | null>;
   findMany(options: FindPatternsOptions): Promise<FindResult<CulturePattern>>;
   save(pattern: CulturePattern): Promise<CulturePattern>;
   update(pattern: CulturePattern): Promise<CulturePattern>;

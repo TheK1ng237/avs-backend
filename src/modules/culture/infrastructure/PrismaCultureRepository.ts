@@ -43,6 +43,14 @@ export class PrismaCultureRepository implements ICultureRepository {
     return row ? this.toDomain(row) : null;
   }
 
+  async findByIdOrSlug(identifier: string): Promise<CulturePattern | null> {
+    const row = await this.prisma.pattern.findFirst({
+      where: { OR: [{ id: identifier }, { slug: identifier }] },
+      include: { origin: true, colors: true, symbols: true, artisanQuote: true },
+    });
+    return row ? this.toDomain(row) : null;
+  }
+
   async findBySlugRaw(slug: string) {
     return await this.prisma.pattern.findUnique({
       where: { slug },
