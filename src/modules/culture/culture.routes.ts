@@ -31,6 +31,13 @@ const controller = new CultureController(service);
  */
 router.get('/symbols/catalog', optionalAuthenticate, publicApiRateLimiter, controller.listSymbols);
 router.get('/symbols', optionalAuthenticate, publicApiRateLimiter, controller.listSymbols);
+router.post(
+  '/symbols',
+  authenticate,
+  requireCurator,
+  uploadSymbolImage.single('image'),
+  controller.createSymbol,
+);
 
 /**
  * @swagger
@@ -249,7 +256,7 @@ router.get('/recent/global', authenticate, controller.getRecentGlobal);
  */
 router.get('/:slug/share', publicApiRateLimiter, controller.getShareData);
 router.get('/:slug', publicApiRateLimiter, controller.getBySlug);
-router.get('/:slug/stats', publicApiRateLimiter, controller.getStats);
+router.get('/:slug/stats', optionalAuthenticate, publicApiRateLimiter, controller.getStats);
 
 /**
  * @swagger
@@ -818,6 +825,6 @@ router.delete('/:id', authenticate, requireAdmin, controller.remove);
  */
 router.get('/:slug/preview', publicApiRateLimiter, controller.preview);
 router.get('/:id/download', publicApiRateLimiter, controller.download);
-router.post('/:id/view', publicApiRateLimiter, controller.trackView);
+router.post('/:id/view', optionalAuthenticate, publicApiRateLimiter, controller.trackView);
 
 export default router;

@@ -136,8 +136,8 @@ model Symbol {
   meaning    String
   usage      String
   sacred     Boolean @default(false)
-  patternId  String
-  pattern    Pattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+  patternId  String?
+  pattern    Pattern? @relation(fields: [patternId], references: [id], onDelete: Cascade)
 
   @@map("symbols")
 }

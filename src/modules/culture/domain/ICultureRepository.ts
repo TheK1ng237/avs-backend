@@ -43,7 +43,7 @@ export interface SymbolEntry extends Symbol {
       country: string;
       flag: string;
     } | null;
-  };
+  } | null;
 }
 
 export interface CreateSymbolData {
@@ -70,7 +70,7 @@ export interface ICultureRepository {
   exists(slug: string): Promise<boolean>;
   findSymbols(options: FindSymbolsOptions): Promise<SymbolEntry[]>;
   findSymbolById(id: string): Promise<Symbol | null>;
-  createSymbol(patternId: string, data: CreateSymbolData): Promise<Symbol>;
+  createSymbol(patternId: string | null, data: CreateSymbolData): Promise<Symbol>;
   updateSymbol(id: string, data: UpdateSymbolData): Promise<Symbol>;
   deleteSymbol(id: string): Promise<void>;
 }

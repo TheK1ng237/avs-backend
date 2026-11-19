@@ -240,7 +240,7 @@ export class CultureController {
   };
 
   createSymbol = async (
-    req: Request<{ patternId: string }>,
+    req: Request<{ patternId?: string }>,
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
@@ -255,7 +255,7 @@ export class CultureController {
       let symbol;
       try {
         symbol = await this.service.createSymbol(
-          req.params.patternId,
+          req.params.patternId ?? null,
           {
             ...data,
             ...(uploadedImage && { imageUrl: uploadedImage.url, imageKey: uploadedImage.key }),
@@ -985,12 +985,27 @@ export class CultureController {
     try {
       const pattern = await db.pattern.findFirst({
         where: { OR: [{ id: req.params.id }, { slug: req.params.id }] },
-        select: { id: true, status: true },
+        select: { id: true, status: true, createdById: true, views: true, downloads: true },
       });
 
       if (pattern) {
         if (pattern.status !== 'PUBLISHED') {
-          res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+          const requesterId = req.user?.userId;
+          const requesterRole = String(req.user?.role ?? '').toLowerCase();
+          const canInspectUnpublished =
+            requesterId === pattern.createdById ||
+            requesterRole === 'admin' ||
+            requesterRole === 'super_admin' ||
+            requesterRole === 'curator';
+
+          if (!canInspectUnpublished) {
+            res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+            return;
+          }
+
+          res.json(
+            ok({ views: pattern.views, downloads: pattern.downloads }, 'Statistics retrieved'),
+          );
           return;
         }
         const updated = await db.pattern.update({
@@ -1027,13 +1042,23 @@ export class CultureController {
     try {
       const pattern = await db.pattern.findFirst({
         where: { OR: [{ id: req.params.slug }, { slug: req.params.slug }] },
-        select: { status: true, views: true, downloads: true },
+        select: { status: true, views: true, downloads: true, createdById: true },
       });
 
       if (pattern) {
         if (pattern.status !== 'PUBLISHED') {
-          res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
-          return;
+          const requesterId = req.user?.userId;
+          const requesterRole = String(req.user?.role ?? '').toLowerCase();
+          const canInspectUnpublished =
+            requesterId === pattern.createdById ||
+            requesterRole === 'admin' ||
+            requesterRole === 'super_admin' ||
+            requesterRole === 'curator';
+
+          if (!canInspectUnpublished) {
+            res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+            return;
+          }
         }
         res.json(ok({ views: pattern.views, downloads: pattern.downloads }));
         return;

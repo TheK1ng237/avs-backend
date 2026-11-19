@@ -20,7 +20,15 @@ export class StorageService {
       }
     }
 
-    throw new Error(`All storage providers failed: ${lastError?.message}`);
+    if (this.providers.length === 0) {
+      throw new Error(
+        'No storage provider is configured. Set STORAGE_PROVIDER and its required credentials.',
+      );
+    }
+
+    throw new Error(
+      `All storage providers failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+    );
   }
 
   async delete(key: string): Promise<void> {
@@ -49,6 +57,14 @@ export class StorageService {
       }
     }
 
-    throw new Error(`All storage providers failed for download: ${lastError?.message}`);
+    if (this.providers.length === 0) {
+      throw new Error(
+        'No storage provider is configured. Set STORAGE_PROVIDER and its required credentials.',
+      );
+    }
+
+    throw new Error(
+      `All storage providers failed for download: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+    );
   }
 }

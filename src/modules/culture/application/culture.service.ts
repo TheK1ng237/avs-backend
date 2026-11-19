@@ -274,7 +274,7 @@ export class CultureService {
   }
 
   async createSymbol(
-    patternId: string,
+    patternId: string | null,
     dto: CreateCultureSymbolDto,
     requesterRole: string,
   ): Promise<Symbol> {
@@ -282,7 +282,7 @@ export class CultureService {
       throw new ForbiddenError('Seuls les curateurs et administrateurs peuvent créer un symbole');
     }
 
-    if (!(await this.repository.findById(patternId))) {
+    if (patternId && !(await this.repository.findById(patternId))) {
       throw new NotFoundError(`Motif #${patternId}`);
     }
 

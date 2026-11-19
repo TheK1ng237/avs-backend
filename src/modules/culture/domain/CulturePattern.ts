@@ -46,7 +46,7 @@ export interface Symbol {
   meaning: string;
   usage: string;
   sacred: boolean;
-  patternId: string;
+  patternId: string | null;
 }
 
 export interface ArtisanQuote {

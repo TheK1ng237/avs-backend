@@ -220,10 +220,15 @@ export class PrismaCultureRepository implements ICultureRepository {
   }
 
   async findSymbols(options: FindSymbolsOptions): Promise<SymbolEntry[]> {
+    const patternFilters = [
+      ...(options.onlyPublished ? [{ pattern: { status: 'PUBLISHED' as const } }] : []),
+      ...(options.createdById ? [{ pattern: { createdById: options.createdById } }] : []),
+    ];
     const rows = await this.prisma.symbol.findMany({
       where: {
-        ...(options.onlyPublished && { pattern: { status: 'PUBLISHED' } }),
-        ...(options.createdById && { pattern: { createdById: options.createdById } }),
+        ...(patternFilters.length > 0 && {
+          OR: [{ patternId: null }, { AND: patternFilters }],
+        }),
       },
       include: {
         pattern: {
@@ -243,23 +248,25 @@ export class PrismaCultureRepository implements ICultureRepository {
       usage: row.usage,
       sacred: row.sacred,
       patternId: row.patternId,
-      pattern: {
-        id: row.pattern.id,
-        slug: row.pattern.slug,
-        name: row.pattern.name,
-        nameLocal: row.pattern.nameLocal,
-        type: row.pattern.type as PatternType,
-        status: row.pattern.status,
-        sources: row.pattern.sources,
-        origin: row.pattern.origin
-          ? {
-              people: row.pattern.origin.people,
-              region: row.pattern.origin.region,
-              country: row.pattern.origin.country,
-              flag: row.pattern.origin.flag,
-            }
-          : null,
-      },
+      pattern: row.pattern
+        ? {
+            id: row.pattern.id,
+            slug: row.pattern.slug,
+            name: row.pattern.name,
+            nameLocal: row.pattern.nameLocal,
+            type: row.pattern.type as PatternType,
+            status: row.pattern.status,
+            sources: row.pattern.sources,
+            origin: row.pattern.origin
+              ? {
+                  people: row.pattern.origin.people,
+                  region: row.pattern.origin.region,
+                  country: row.pattern.origin.country,
+                  flag: row.pattern.origin.flag,
+                }
+              : null,
+          }
+        : null,
     }));
   }
 
@@ -267,11 +274,11 @@ export class PrismaCultureRepository implements ICultureRepository {
     return this.prisma.symbol.findUnique({ where: { id } });
   }
 
-  async createSymbol(patternId: string, data: CreateSymbolData): Promise<Symbol> {
+  async createSymbol(patternId: string | null, data: CreateSymbolData): Promise<Symbol> {
     return this.prisma.symbol.create({
       data: {
         ...data,
-        pattern: { connect: { id: patternId } },
+        ...(patternId ? { pattern: { connect: { id: patternId } } } : {}),
       },
     });
   }
