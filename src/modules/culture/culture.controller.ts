@@ -10,6 +10,7 @@ import { ok } from '@/shared/types/api.types';
 import { StatusCodes } from 'http-status-codes';
 import { logger } from '@/shared/utils/logger';
 import { createStorageService } from '@/infra/storage/storage.factory';
+import { extractStorageKeyFromUrl } from '@/infra/storage/storageUrl';
 import { PatternListResponseMapper } from './dto/PatternListResponse.mapper';
 import { db } from '@/infra/database/database';
 import { generateVectorSvgFromCss } from './utils/svgExporter';
@@ -446,7 +447,18 @@ export class CultureController {
           return;
         }
 
-        res.json(ok(PatternListResponseMapper.toPatternDoc(pattern)));
+        const updatedPattern = await db.pattern.update({
+          where: { id: pattern.id },
+          data: { views: { increment: 1 } },
+          include: {
+            origin: true,
+            colors: true,
+            symbols: true,
+            artisanQuote: true,
+            symbolism: true,
+          },
+        });
+        res.json(ok(PatternListResponseMapper.toPatternDoc(updatedPattern)));
         return;
       }
 
@@ -939,15 +951,21 @@ export class CultureController {
 
       if (pattern.svgContent) {
         fileBuffer = Buffer.from(pattern.svgContent, 'utf-8');
-      } else if (pattern.imgUrl && pattern.imgUrl.includes('/patterns/')) {
-        const urlParts = pattern.imgUrl.split('/patterns/');
-        if (urlParts[1]) {
-          fileBuffer = await this.storage.download(urlParts[1]);
+      } else if (pattern.imgUrl) {
+        const storageKey = extractStorageKeyFromUrl(pattern.imgUrl);
+        if (storageKey) {
+          fileBuffer = await this.storage.download(storageKey);
+        } else if (pattern.format === 'SVG') {
+          throw new AppError(
+            'Le fichier SVG enregistré ne peut pas être retrouvé depuis son URL de stockage.',
+            StatusCodes.BAD_GATEWAY,
+            'PATTERN_ASSET_UNAVAILABLE',
+          );
         }
       }
 
       // Generer un document SVG vectoriel natif et valide pour l'export (Figma, Illustrator, Web)
-      if (!fileBuffer) {
+      if (!fileBuffer && pattern.format !== 'SVG') {
         const svgContent = generateVectorSvgFromCss({
           id: pattern.id,
           name: pattern.name || 'Motif AVS',
@@ -960,6 +978,13 @@ export class CultureController {
           colors: pattern.colors,
         });
         fileBuffer = Buffer.from(svgContent, 'utf-8');
+      }
+      if (!fileBuffer) {
+        throw new AppError(
+          'Aucun fichier SVG ni contenu vectoriel exploitable n’est disponible pour ce motif.',
+          StatusCodes.UNPROCESSABLE_ENTITY,
+          'PATTERN_SVG_UNAVAILABLE',
+        );
       }
 
       // Increment download counter atomically in DB
@@ -1023,9 +1048,12 @@ export class CultureController {
             return;
           }
 
-          res.json(
-            ok({ views: pattern.views, downloads: pattern.downloads }, 'Statistics retrieved'),
-          );
+          const updated = await db.pattern.update({
+            where: { id: pattern.id },
+            data: { views: { increment: 1 } },
+            select: { views: true, downloads: true },
+          });
+          res.json(ok(updated, 'View incremented successfully'));
           return;
         }
         const updated = await db.pattern.update({
