@@ -78,7 +78,10 @@ export class ActivityService {
     return this.repository.getUserStats(userId);
   }
 
-  async getGlobalActivity(params?: { skip?: number; take?: number }): Promise<Activity[]> {
+  async getGlobalActivity(params?: {
+    skip?: number;
+    take?: number;
+  }): Promise<Array<Activity & { target?: string }>> {
     return this.repository.findGlobal(params);
   }
 }

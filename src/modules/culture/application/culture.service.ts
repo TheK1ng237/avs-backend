@@ -14,6 +14,7 @@ import {
   Symbolism,
   type CulturePatternProps,
   type PatternType,
+  type Status,
   type Symbol,
 } from '../domain/CulturePattern';
 import type {
@@ -264,18 +265,19 @@ export class CultureService {
   }
 
   async listSymbols(requesterId?: string, requesterRole?: string): Promise<SymbolEntry[]> {
-    const role = this.normalizeRole(requesterRole);
-    const options: FindSymbolsOptions = {
-      onlyPublished: !role || role === 'viewer',
-      ...(role === 'contributor' || role === 'curator' ? { createdById: requesterId } : {}),
-    };
+    if (this.isAdminLike(requesterRole)) return this.repository.findSymbols({});
+    if (!requesterId) return this.repository.findSymbols({ onlyPublished: true });
+    return this.repository.findSymbols({ createdById: requesterId });
+  }
 
-    return this.repository.findSymbols(options);
+  async listPublishedSymbols(): Promise<SymbolEntry[]> {
+    return this.repository.findSymbols({ onlyPublished: true });
   }
 
   async createSymbol(
     patternId: string | null,
     dto: CreateCultureSymbolDto,
+    requesterId: string,
     requesterRole: string,
   ): Promise<Symbol> {
     if (!this.isCuratorOrAdmin(requesterRole)) {
@@ -286,54 +288,57 @@ export class CultureService {
       throw new NotFoundError(`Motif #${patternId}`);
     }
 
-    return this.repository.createSymbol(patternId, dto);
+    return this.repository.createSymbol(patternId, requesterId, dto);
   }
 
   async updateSymbol(
     id: string,
     dto: UpdateCultureSymbolDto,
+    requesterId: string,
     requesterRole: string,
   ): Promise<Symbol> {
-    if (!this.isCuratorOrAdmin(requesterRole)) {
-      throw new ForbiddenError(
-        'Seuls les curateurs et administrateurs peuvent modifier un symbole',
-      );
-    }
-
-    if (!(await this.repository.findSymbolById(id))) {
+    this.assertCanManageRole(requesterRole);
+    const symbol = await this.repository.findSymbolById(id);
+    if (!symbol) {
       throw new NotFoundError(`Symbole #${id}`);
     }
+    this.assertCanManageSymbol(symbol, requesterId, requesterRole);
 
     return this.repository.updateSymbol(id, dto);
   }
 
-  async getSymbolById(id: string, requesterRole: string): Promise<Symbol> {
-    if (!this.isCuratorOrAdmin(requesterRole)) {
-      throw new ForbiddenError(
-        'Seuls les curateurs et administrateurs peuvent gérer les images de symboles',
-      );
-    }
-
+  async getSymbolById(id: string, requesterId: string, requesterRole: string): Promise<Symbol> {
+    this.assertCanManageRole(requesterRole);
     const symbol = await this.repository.findSymbolById(id);
     if (!symbol) {
       throw new NotFoundError(`Symbole #${id}`);
     }
 
+    this.assertCanManageSymbol(symbol, requesterId, requesterRole);
     return symbol;
   }
 
-  async deleteSymbol(id: string, requesterRole: string): Promise<void> {
-    if (!this.isCuratorOrAdmin(requesterRole)) {
-      throw new ForbiddenError(
-        'Seuls les curateurs et administrateurs peuvent supprimer un symbole',
-      );
+  async deleteSymbol(id: string, requesterId: string, requesterRole: string): Promise<void> {
+    this.assertCanManageRole(requesterRole);
+    const symbol = await this.repository.findSymbolById(id);
+    if (!symbol) {
+      throw new NotFoundError(`Symbole #${id}`);
+    }
+    this.assertCanManageSymbol(symbol, requesterId, requesterRole);
+
+    await this.repository.deleteSymbol(id);
+  }
+
+  async updateSymbolStatus(id: string, status: Status, requesterRole: string): Promise<Symbol> {
+    if (!this.isAdminLike(requesterRole)) {
+      throw new ForbiddenError('Seuls les administrateurs peuvent changer le statut d’un symbole');
     }
 
     if (!(await this.repository.findSymbolById(id))) {
       throw new NotFoundError(`Symbole #${id}`);
     }
 
-    await this.repository.deleteSymbol(id);
+    return this.repository.updateSymbolStatus(id, status);
   }
 
   // ── Utilitaires de rôle ───────────────────────────────────────────────────
@@ -344,6 +349,19 @@ export class CultureService {
   private isCuratorOrAdmin(role?: string): boolean {
     const normalized = this.normalizeRole(role);
     return ['curator', 'admin', 'super_admin'].includes(normalized);
+  }
+
+  private assertCanManageSymbol(symbol: Symbol, requesterId: string, requesterRole: string): void {
+    this.assertCanManageRole(requesterRole);
+    if (!this.isAdminLike(requesterRole) && symbol.createdById !== requesterId) {
+      throw new ForbiddenError('Vous ne pouvez gérer que les symboles dont vous êtes l’auteur');
+    }
+  }
+
+  private assertCanManageRole(requesterRole: string): void {
+    if (!this.isCuratorOrAdmin(requesterRole)) {
+      throw new ForbiddenError('Un rôle curateur ou administrateur est requis');
+    }
   }
 
   private isAdminLike(role?: string): boolean {

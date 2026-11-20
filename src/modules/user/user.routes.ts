@@ -176,7 +176,7 @@ router.post('/me/avatar', authenticate, upload.single('avatar'), controller.uplo
  * @swagger
  * /api/v1/users/admin:
  *   get:
- *     summary: Get all users (admin only)
+ *     summary: Get all users (super admin only)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -200,7 +200,7 @@ router.post('/me/avatar', authenticate, upload.single('avatar'), controller.uplo
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-router.get('/admin', authenticate, requireAdmin, controller.getAllUsers);
+router.get('/admin', authenticate, requireSuperAdmin, controller.getAllUsers);
 
 /**
  * @swagger
@@ -240,7 +240,7 @@ router.patch('/admin/:userId/role', authenticate, requireSuperAdmin, controller.
  * @swagger
  * /api/v1/users/admin/{userId}/verification:
  *   patch:
- *     summary: Toggle user verification (admin only)
+ *     summary: Toggle user verification (super admin only)
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -267,7 +267,7 @@ router.patch('/admin/:userId/role', authenticate, requireSuperAdmin, controller.
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-router.patch('/admin/:userId/verification', authenticate, requireAdmin, controller.toggleUserVerification);
+router.patch('/admin/:userId/verification', authenticate, requireSuperAdmin, controller.toggleUserVerification);
 
 /**
  * @swagger

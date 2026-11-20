@@ -224,6 +224,9 @@ const UpdateSymbolSchema = CreateSymbolSchema.partial().refine(
   (data) => Object.keys(data).length > 0,
   'Au moins un champ doit être renseigné',
 );
+const UpdateSymbolStatusSchema = z.object({
+  status: z.enum(['DRAFT', 'PUBLISHED', 'REVIEW', 'REJECTED']),
+});
 
 // ── Factory — injection du service ───────────────────────────────────────────
 export class CultureController {
@@ -232,6 +235,15 @@ export class CultureController {
   private storage = createStorageService();
 
   listSymbols = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const symbols = await this.service.listPublishedSymbols();
+      res.json(ok(symbols, 'Symboles publiés récupérés avec succès'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listManagedSymbols = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const symbols = await this.service.listSymbols(req.user?.userId, req.user?.role);
       res.json(ok(symbols, 'Symboles récupérés avec succès'));
@@ -261,6 +273,7 @@ export class CultureController {
             ...data,
             ...(uploadedImage && { imageUrl: uploadedImage.url, imageKey: uploadedImage.key }),
           },
+          req.user!.userId,
           req.user?.role ?? '',
         );
       } catch (error) {
@@ -292,7 +305,10 @@ export class CultureController {
     try {
       const data = UpdateSymbolSchema.parse(req.body);
       const role = req.user?.role ?? '';
-      const existing = req.file ? await this.service.getSymbolById(req.params.id, role) : null;
+      const requesterId = req.user!.userId;
+      const existing = req.file
+        ? await this.service.getSymbolById(req.params.id, requesterId, role)
+        : null;
       let uploadedImage: Awaited<ReturnType<typeof this.storage.upload>> | undefined;
       if (req.file) {
         req.file.originalname = `symbol${allowedSymbolImageTypes[req.file.mimetype]}`;
@@ -307,6 +323,7 @@ export class CultureController {
             ...data,
             ...(uploadedImage && { imageUrl: uploadedImage.url, imageKey: uploadedImage.key }),
           },
+          requesterId,
           role,
         );
       } catch (error) {
@@ -340,11 +357,42 @@ export class CultureController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const existing = await this.service.getSymbolById(req.params.id, req.user?.role ?? '');
-      await this.service.deleteSymbol(req.params.id, req.user?.role ?? '');
+      const requesterId = req.user!.userId;
+      const role = req.user?.role ?? '';
+      const existing = await this.service.getSymbolById(req.params.id, requesterId, role);
+      await this.service.deleteSymbol(req.params.id, requesterId, role);
       if (existing.imageKey) await this.storage.delete(existing.imageKey);
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
+      next(err);
+    }
+  };
+
+  updateSymbolStatus = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { status } = UpdateSymbolStatusSchema.parse(req.body);
+      const symbol = await this.service.updateSymbolStatus(
+        req.params.id,
+        status,
+        req.user?.role ?? '',
+      );
+      res.json(ok(symbol, 'Statut du symbole mis à jour avec succès'));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+          success: false,
+          message: 'Validation failed',
+          errors: err.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        });
+        return;
+      }
       next(err);
     }
   };

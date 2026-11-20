@@ -6,7 +6,7 @@
 // interface côté Java. La couche Application (Service) n'a pas besoin de changer.
 // =============================================================================
 
-import type { CulturePattern, PatternType, Origin, Symbol } from './CulturePattern';
+import type { CulturePattern, PatternType, Origin, Status, Symbol } from './CulturePattern';
 
 export interface FindPatternsOptions {
   page?: number;
@@ -71,7 +71,12 @@ export interface ICultureRepository {
   exists(slug: string): Promise<boolean>;
   findSymbols(options: FindSymbolsOptions): Promise<SymbolEntry[]>;
   findSymbolById(id: string): Promise<Symbol | null>;
-  createSymbol(patternId: string | null, data: CreateSymbolData): Promise<Symbol>;
+  createSymbol(
+    patternId: string | null,
+    createdById: string,
+    data: CreateSymbolData,
+  ): Promise<Symbol>;
   updateSymbol(id: string, data: UpdateSymbolData): Promise<Symbol>;
+  updateSymbolStatus(id: string, status: Status): Promise<Symbol>;
   deleteSymbol(id: string): Promise<void>;
 }

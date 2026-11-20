@@ -93,7 +93,9 @@ export function toPatternDoc(domain: any): PatternDoc {
     technique: domain.technique || '',
     symbolism: domain.symbolism,
     ceremonial: domain.ceremonial || '',
-    symbols: (domain.symbols || []) as PatternSymbol[],
+    symbols: (domain.symbols || []).filter(
+      (symbol: { status?: string }) => symbol.status === 'PUBLISHED',
+    ) as PatternSymbol[],
     artisanQuote: domain.artisanQuote
       ? {
           text: domain.artisanQuote.text,

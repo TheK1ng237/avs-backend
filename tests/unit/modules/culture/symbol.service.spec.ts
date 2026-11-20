@@ -37,6 +37,8 @@ const symbol: Symbol = {
   meaning: 'Learning from the past to build a better future.',
   usage: 'Used in teaching and cultural remembrance.',
   sacred: false,
+  status: 'DRAFT',
+  createdById: 'curator-1',
   patternId: 'pattern-1',
 };
 
@@ -52,6 +54,7 @@ const repository: jest.Mocked<ICultureRepository> = {
   findSymbolById: jest.fn(),
   createSymbol: jest.fn(),
   updateSymbol: jest.fn(),
+  updateSymbolStatus: jest.fn(),
   deleteSymbol: jest.fn(),
 };
 
@@ -60,23 +63,28 @@ const service = new CultureService(repository);
 describe('CultureService symbol management', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('limits anonymous symbol listings to published patterns', async () => {
+  it('limits anonymous symbol listings to published symbols', async () => {
     repository.findSymbols.mockResolvedValue([]);
 
-    await service.listSymbols();
+    await service.listPublishedSymbols();
 
     expect(repository.findSymbols).toHaveBeenCalledWith({ onlyPublished: true });
   });
 
-  it('limits contributor listings to their own patterns', async () => {
+  it('limits contributor listings to their own symbols', async () => {
     repository.findSymbols.mockResolvedValue([]);
 
     await service.listSymbols('contributor-1', 'contributor');
 
-    expect(repository.findSymbols).toHaveBeenCalledWith({
-      onlyPublished: false,
-      createdById: 'contributor-1',
-    });
+    expect(repository.findSymbols).toHaveBeenCalledWith({ createdById: 'contributor-1' });
+  });
+
+  it('lets admins list every symbol', async () => {
+    repository.findSymbols.mockResolvedValue([]);
+
+    await service.listSymbols('admin-1', 'admin');
+
+    expect(repository.findSymbols).toHaveBeenCalledWith({});
   });
 
   it('creates a symbol on an existing pattern for a curator', async () => {
@@ -92,28 +100,60 @@ describe('CultureService symbol management', () => {
       sacred: symbol.sacred,
     };
 
-    await expect(service.createSymbol('pattern-1', data, 'curator')).resolves.toEqual(symbol);
-    expect(repository.createSymbol).toHaveBeenCalledWith('pattern-1', data);
+    await expect(service.createSymbol('pattern-1', data, 'curator-1', 'curator')).resolves.toEqual(
+      symbol,
+    );
+    expect(repository.createSymbol).toHaveBeenCalledWith('pattern-1', 'curator-1', data);
   });
 
   it('rejects symbol creation for a missing pattern', async () => {
     repository.findById.mockResolvedValue(null);
 
     await expect(
-      service.createSymbol('missing-pattern', {
-        name: symbol.name,
-        nameFr: symbol.nameFr,
-        cssPreview: symbol.cssPreview,
-        imageUrl: symbol.imageUrl,
-        meaning: symbol.meaning,
-        usage: symbol.usage,
-        sacred: symbol.sacred,
-      }, 'curator')
+      service.createSymbol(
+        'missing-pattern',
+        {
+          name: symbol.name,
+          nameFr: symbol.nameFr,
+          cssPreview: symbol.cssPreview,
+          imageUrl: symbol.imageUrl,
+          meaning: symbol.meaning,
+          usage: symbol.usage,
+          sacred: symbol.sacred,
+        },
+        'curator-1',
+        'curator',
+      ),
     ).rejects.toThrow(NotFoundError);
   });
 
   it('rejects symbol modifications from contributors', async () => {
-    await expect(service.deleteSymbol('symbol-1', 'contributor')).rejects.toThrow(ForbiddenError);
+    await expect(service.deleteSymbol('symbol-1', 'contributor-1', 'contributor')).rejects.toThrow(
+      ForbiddenError,
+    );
     expect(repository.findSymbolById).not.toHaveBeenCalled();
+  });
+
+  it('prevents a curator from editing another author’s symbol', async () => {
+    repository.findSymbolById.mockResolvedValue(symbol);
+
+    await expect(
+      service.updateSymbol('symbol-1', { meaning: 'Changed meaning.' }, 'curator-2', 'curator'),
+    ).rejects.toThrow(ForbiddenError);
+    expect(repository.updateSymbol).not.toHaveBeenCalled();
+  });
+
+  it('allows only admins to change symbol publication status', async () => {
+    await expect(service.updateSymbolStatus('symbol-1', 'PUBLISHED', 'curator')).rejects.toThrow(
+      ForbiddenError,
+    );
+
+    repository.findSymbolById.mockResolvedValue(symbol);
+    repository.updateSymbolStatus.mockResolvedValue({ ...symbol, status: 'PUBLISHED' });
+    await expect(
+      service.updateSymbolStatus('symbol-1', 'PUBLISHED', 'admin'),
+    ).resolves.toMatchObject({
+      status: 'PUBLISHED',
+    });
   });
 });

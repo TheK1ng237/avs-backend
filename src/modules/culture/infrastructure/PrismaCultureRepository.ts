@@ -21,6 +21,7 @@ import {
   CulturePattern,
   type PatternType,
   type PatternFormat,
+  type Status,
   type Symbol,
 } from '../domain/CulturePattern';
 
@@ -228,14 +229,14 @@ export class PrismaCultureRepository implements ICultureRepository {
   }
 
   async findSymbols(options: FindSymbolsOptions): Promise<SymbolEntry[]> {
-    const patternFilters = [
-      ...(options.onlyPublished ? [{ pattern: { status: 'PUBLISHED' as const } }] : []),
-      ...(options.createdById ? [{ pattern: { createdById: options.createdById } }] : []),
-    ];
     const rows = await this.prisma.symbol.findMany({
       where: {
-        ...(patternFilters.length > 0 && {
-          OR: [{ patternId: null }, { AND: patternFilters }],
+        ...(options.createdById && { createdById: options.createdById }),
+        ...(options.onlyPublished && {
+          AND: [
+            { status: 'PUBLISHED' },
+            { OR: [{ patternId: null }, { pattern: { status: 'PUBLISHED' } }] },
+          ],
         }),
       },
       include: {
@@ -255,6 +256,8 @@ export class PrismaCultureRepository implements ICultureRepository {
       meaning: row.meaning,
       usage: row.usage,
       sacred: row.sacred,
+      status: row.status,
+      createdById: row.createdById,
       patternId: row.patternId,
       pattern: row.pattern
         ? {
@@ -282,10 +285,15 @@ export class PrismaCultureRepository implements ICultureRepository {
     return this.prisma.symbol.findUnique({ where: { id } });
   }
 
-  async createSymbol(patternId: string | null, data: CreateSymbolData): Promise<Symbol> {
+  async createSymbol(
+    patternId: string | null,
+    createdById: string,
+    data: CreateSymbolData,
+  ): Promise<Symbol> {
     return this.prisma.symbol.create({
       data: {
         ...data,
+        creator: { connect: { id: createdById } },
         ...(patternId ? { pattern: { connect: { id: patternId } } } : {}),
       },
     });
@@ -293,6 +301,10 @@ export class PrismaCultureRepository implements ICultureRepository {
 
   async updateSymbol(id: string, data: UpdateSymbolData): Promise<Symbol> {
     return this.prisma.symbol.update({ where: { id }, data });
+  }
+
+  async updateSymbolStatus(id: string, status: Status): Promise<Symbol> {
+    return this.prisma.symbol.update({ where: { id }, data: { status } });
   }
 
   async deleteSymbol(id: string): Promise<void> {

@@ -4,10 +4,7 @@ import { PrismaClient, Activity } from '@prisma/client';
 export class PrismaActivityRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async findByUser(
-    userId: string,
-    params?: { skip?: number; take?: number }
-  ): Promise<Activity[]> {
+  async findByUser(userId: string, params?: { skip?: number; take?: number }): Promise<Activity[]> {
     return this.db.activity.findMany({
       where: { userId },
       skip: params?.skip,
@@ -84,8 +81,11 @@ export class PrismaActivityRepository {
     };
   }
 
-  async findGlobal(params?: { skip?: number; take?: number }): Promise<Activity[]> {
-    return this.db.activity.findMany({
+  async findGlobal(params?: {
+    skip?: number;
+    take?: number;
+  }): Promise<Array<Activity & { target?: string }>> {
+    const activities = await this.db.activity.findMany({
       skip: params?.skip,
       take: params?.take ?? 20,
       orderBy: { createdAt: 'desc' },
@@ -99,5 +99,21 @@ export class PrismaActivityRepository {
         },
       },
     });
+
+    const patternIds = activities
+      .filter((activity) => ['pattern', 'Pattern'].includes(activity.targetType))
+      .map((activity) => activity.targetId);
+    const patterns = patternIds.length
+      ? await this.db.pattern.findMany({
+          where: { id: { in: patternIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const patternNames = new Map(patterns.map((pattern) => [pattern.id, pattern.name]));
+
+    return activities.map((activity) => ({
+      ...activity,
+      target: patternNames.get(activity.targetId) ?? activity.targetId,
+    }));
   }
 }

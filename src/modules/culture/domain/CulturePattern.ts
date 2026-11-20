@@ -46,6 +46,8 @@ export interface Symbol {
   meaning: string;
   usage: string;
   sacred: boolean;
+  status: Status;
+  createdById: string | null;
   patternId: string | null;
 }
 

@@ -24,13 +24,13 @@ const controller = new CultureController(service);
  *   get:
  *     summary: Lister les symboles culturels
  *     tags: [Symbols]
- *     description: Retourne les symboles des motifs publiés. Les curateurs voient également les fiches liées à leurs motifs et les administrateurs voient l'ensemble du catalogue.
+ *     description: Retourne uniquement les symboles publiés (et reliés à un motif publié, le cas échéant).
  *     responses:
  *       200:
  *         description: Liste des symboles et contexte du motif associé
  */
 router.get('/symbols/catalog', optionalAuthenticate, publicApiRateLimiter, controller.listSymbols);
-router.get('/symbols', optionalAuthenticate, publicApiRateLimiter, controller.listSymbols);
+router.get('/symbols', authenticate, controller.listManagedSymbols);
 router.post(
   '/symbols',
   authenticate,
@@ -111,6 +111,37 @@ router.patch(
   uploadSymbolImage.single('image'),
   controller.updateSymbol,
 );
+/**
+ * @swagger
+ * /api/v1/patterns/symbols/{id}/status:
+ *   patch:
+ *     summary: Update a symbol publication status (admin only)
+ *     tags: [Symbols]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [DRAFT, REVIEW, PUBLISHED, REJECTED]
+ *     responses:
+ *       200:
+ *         description: Symbol status updated
+ *       403:
+ *         description: Admin role required
+ */
+router.patch('/symbols/:id/status', authenticate, requireAdmin, controller.updateSymbolStatus);
 
 /**
  * @swagger

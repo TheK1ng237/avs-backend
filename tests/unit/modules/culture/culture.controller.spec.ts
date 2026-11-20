@@ -17,6 +17,10 @@ jest.mock('@/infra/storage/storage.factory', () => ({
   }),
 }));
 
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'test-uuid'),
+}));
+
 import { db } from '@/infra/database/database';
 import { CultureService } from '@/modules/culture/application/culture.service';
 import type { ICultureRepository } from '@/modules/culture/domain/ICultureRepository';
