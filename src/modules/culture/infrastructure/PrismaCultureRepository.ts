@@ -8,8 +8,22 @@
 // =============================================================================
 
 import type { PrismaClient, Prisma } from '@prisma/client';
-import type { ICultureRepository, FindPatternsOptions, FindResult } from '../domain/ICultureRepository';
-import { CulturePattern, type PatternType, type PatternFormat } from '../domain/CulturePattern';
+import type {
+  ICultureRepository,
+  FindPatternsOptions,
+  FindResult,
+  FindSymbolsOptions,
+  SymbolEntry,
+  CreateSymbolData,
+  UpdateSymbolData,
+} from '../domain/ICultureRepository';
+import {
+  CulturePattern,
+  type PatternType,
+  type PatternFormat,
+  type Status,
+  type Symbol,
+} from '../domain/CulturePattern';
 
 export class PrismaCultureRepository implements ICultureRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -25,6 +39,14 @@ export class PrismaCultureRepository implements ICultureRepository {
   async findBySlug(slug: string): Promise<CulturePattern | null> {
     const row = await this.prisma.pattern.findUnique({
       where: { slug },
+      include: { origin: true, colors: true, symbols: true, artisanQuote: true },
+    });
+    return row ? this.toDomain(row) : null;
+  }
+
+  async findByIdOrSlug(identifier: string): Promise<CulturePattern | null> {
+    const row = await this.prisma.pattern.findFirst({
+      where: { OR: [{ id: identifier }, { slug: identifier }] },
       include: { origin: true, colors: true, symbols: true, artisanQuote: true },
     });
     return row ? this.toDomain(row) : null;
@@ -61,18 +83,18 @@ export class PrismaCultureRepository implements ICultureRepository {
       this.prisma.pattern.count({ where }),
     ]);
 
-    return { items: rows.map(r => this.toDomain(r)), totalItems };
+    return { items: rows.map((r) => this.toDomain(r)), totalItems };
   }
 
   async save(pattern: CulturePattern): Promise<CulturePattern> {
     const data = this.toPersistence(pattern);
-    const row  = await this.prisma.pattern.create({ data });
+    const row = await this.prisma.pattern.create({ data });
     return this.toDomain(row);
   }
 
   async update(pattern: CulturePattern): Promise<CulturePattern> {
     const props = pattern.toObject();
-    
+
     const data: any = {
       // Ne pas mettre à jour le slug pour éviter les conflits
       name: props.name || '',
@@ -206,6 +228,89 @@ export class PrismaCultureRepository implements ICultureRepository {
     return count > 0;
   }
 
+  async findSymbols(options: FindSymbolsOptions): Promise<SymbolEntry[]> {
+    const rows = await this.prisma.symbol.findMany({
+      where: {
+        ...(options.createdById && { createdById: options.createdById }),
+        ...(options.onlyPublished && {
+          AND: [
+            { status: 'PUBLISHED' },
+            { OR: [{ patternId: null }, { pattern: { status: 'PUBLISHED' } }] },
+          ],
+        }),
+      },
+      include: {
+        pattern: {
+          include: { origin: true },
+        },
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      nameFr: row.nameFr,
+      cssPreview: row.cssPreview,
+      imageUrl: row.imageUrl,
+      meaning: row.meaning,
+      usage: row.usage,
+      sacred: row.sacred,
+      status: row.status,
+      createdById: row.createdById,
+      patternId: row.patternId,
+      pattern: row.pattern
+        ? {
+            id: row.pattern.id,
+            slug: row.pattern.slug,
+            name: row.pattern.name,
+            nameLocal: row.pattern.nameLocal,
+            type: row.pattern.type as PatternType,
+            status: row.pattern.status,
+            sources: row.pattern.sources,
+            origin: row.pattern.origin
+              ? {
+                  people: row.pattern.origin.people,
+                  region: row.pattern.origin.region,
+                  country: row.pattern.origin.country,
+                  flag: row.pattern.origin.flag,
+                }
+              : null,
+          }
+        : null,
+    }));
+  }
+
+  async findSymbolById(id: string): Promise<Symbol | null> {
+    return this.prisma.symbol.findUnique({ where: { id } });
+  }
+
+  async createSymbol(
+    patternId: string | null,
+    createdById: string,
+    data: CreateSymbolData,
+  ): Promise<Symbol> {
+    return this.prisma.symbol.create({
+      data: {
+        ...data,
+        creator: { connect: { id: createdById } },
+        ...(patternId ? { pattern: { connect: { id: patternId } } } : {}),
+      },
+    });
+  }
+
+  async updateSymbol(id: string, data: UpdateSymbolData): Promise<Symbol> {
+    return this.prisma.symbol.update({ where: { id }, data });
+  }
+
+  async updateSymbolStatus(id: string, status: Status): Promise<Symbol> {
+    return this.prisma.symbol.update({ where: { id }, data: { status } });
+  }
+
+  async deleteSymbol(id: string): Promise<void> {
+    await this.prisma.symbol.delete({ where: { id } });
+  }
+
   // ── Mappers Domain ↔ Persistence ─────────────────────────────────────────
   private toDomain(row: any): CulturePattern {
     return CulturePattern.create({
@@ -243,7 +348,7 @@ export class PrismaCultureRepository implements ICultureRepository {
 
   private toPersistence(pattern: CulturePattern): Prisma.PatternCreateInput & { id: string } {
     const props = pattern.toObject();
-    
+
     const data: any = {
       id: props.id,
       slug: props.slug,

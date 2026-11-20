@@ -45,6 +45,7 @@ model User {
   patterns           Pattern[]
   passwordResetToken PasswordResetToken?
   sessions           Session[]
+  symbols            Symbol[]
 
   @@index([createdAt])
   @@map("users")
@@ -127,17 +128,23 @@ model PatternColor {
 }
 
 model Symbol {
-  id         String  @id @default(cuid())
-  name       String
-  nameFr     String
-  cssPreview String
-  imageUrl   String
-  meaning    String
-  usage      String
-  sacred     Boolean @default(false)
-  patternId  String
-  pattern    Pattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  name        String
+  nameFr      String
+  cssPreview  String
+  imageUrl    String
+  imageKey    String?
+  meaning     String
+  usage       String
+  sacred      Boolean  @default(false)
+  status      Status   @default(DRAFT)
+  createdById String?
+  patternId   String?
+  creator     User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  pattern     Pattern? @relation(fields: [patternId], references: [id], onDelete: Cascade)
 
+  @@index([status])
+  @@index([createdById])
   @@map("symbols")
 }
 
@@ -377,6 +384,8 @@ enum ActivityAction {
   CREATED
   UPDATED
   PUBLISHED
+  DELETED
+  AUTHENTICATED
   COMMENTED
   REVIEWED
   DOWNLOADED

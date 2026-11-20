@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ArtisanService } from '@/modules/artisan/application/artisan.service';
 import { ok } from '@/shared/types/api.types';
 import { StatusCodes } from 'http-status-codes';
+import { logPlatformActivity } from '@/modules/activity/log-platform-activity';
 
 const CreateSchema = z.object({
   name: z.string().min(2).max(128),
@@ -33,15 +34,20 @@ export class ArtisanController {
     }
   };
 
-  getById = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
+  getById = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
-
-      const id=req.params.id;
+      const id = req.params.id;
       if (!id) {
-        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Artisan ID is required' });
+        res
+          .status(StatusCodes.BAD_REQUEST)
+          .json({ success: false, message: 'Artisan ID is required' });
         return;
       }
-      
+
       const artisan = await this.service.getArtisanById(id);
       res.json(ok(artisan, 'Artisan retrieved'));
     } catch (err) {
@@ -59,49 +65,97 @@ export class ArtisanController {
 
       const data = CreateSchema.parse(req.body);
       const artisan = await this.service.createArtisan(userId, data);
+      await logPlatformActivity({
+        userId,
+        action: 'CREATED',
+        targetId: artisan.id,
+        targetType: 'ARTISAN',
+        targetName: artisan.name,
+      });
       res.status(StatusCodes.CREATED).json(ok(artisan, 'Artisan created'));
     } catch (err) {
       next(err);
     }
   };
 
-  update = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
+  update = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const data = CreateSchema.partial().parse(req.body);
       const id = req.params.id;
       if (!id) {
-        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Artisan ID is required' });
+        res
+          .status(StatusCodes.BAD_REQUEST)
+          .json({ success: false, message: 'Artisan ID is required' });
         return;
       }
-      const artisan = await this.service.updateArtisan(id , data);
+      const artisan = await this.service.updateArtisan(id, data);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'UPDATED',
+        targetId: artisan.id,
+        targetType: 'ARTISAN',
+        targetName: artisan.name,
+      });
       res.json(ok(artisan, 'Artisan updated'));
     } catch (err) {
       next(err);
     }
   };
 
-  delete = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
+  delete = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const id = req.params.id;
       if (!id) {
-        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Artisan ID is required' });
+        res
+          .status(StatusCodes.BAD_REQUEST)
+          .json({ success: false, message: 'Artisan ID is required' });
         return;
       }
+      const artisan = await this.service.getArtisanById(id);
       await this.service.deleteArtisan(id);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'DELETED',
+        targetId: artisan.id,
+        targetType: 'ARTISAN',
+        targetName: artisan.name,
+      });
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);
     }
   };
 
-  verify = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
+  verify = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const id = req.params.id;
       if (!id) {
-        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Artisan ID is required' });
+        res
+          .status(StatusCodes.BAD_REQUEST)
+          .json({ success: false, message: 'Artisan ID is required' });
         return;
       }
       const artisan = await this.service.verifyArtisan(id);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'REVIEWED',
+        targetId: artisan.id,
+        targetType: 'ARTISAN',
+        targetName: artisan.name,
+        details: { verified: true },
+      });
       res.json(ok(artisan, 'Artisan verified'));
     } catch (err) {
       next(err);

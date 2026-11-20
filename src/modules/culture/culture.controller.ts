@@ -10,11 +10,13 @@ import { ok } from '@/shared/types/api.types';
 import { StatusCodes } from 'http-status-codes';
 import { logger } from '@/shared/utils/logger';
 import { createStorageService } from '@/infra/storage/storage.factory';
+import { extractStorageKeyFromUrl } from '@/infra/storage/storageUrl';
 import { PatternListResponseMapper } from './dto/PatternListResponse.mapper';
 import { db } from '@/infra/database/database';
+import { logPlatformActivity } from '@/modules/activity/log-platform-activity';
 import { generateVectorSvgFromCss } from './utils/svgExporter';
 import { isStaticPatternSlug, STATIC_PATTERN_EXPORTS } from './staticPatternRegistry';
-import { AppError } from '@/shared/errors/AppError';
+import { AppError, NotFoundError } from '@/shared/errors/AppError';
 
 // ── Multer configuration for SVG file upload ─────────────────────────────────────
 const storage = multer.diskStorage({
@@ -66,6 +68,31 @@ export const uploadSvg = multer({
   },
 });
 
+const allowedSymbolImageTypes: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+};
+
+export const uploadSymbolImage = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    if (allowedSymbolImageTypes[file.mimetype]) {
+      cb(null, true);
+    } else {
+      cb(
+        new AppError(
+          'Format d’image non pris en charge. Utilisez JPEG, PNG, WebP ou GIF.',
+          StatusCodes.UNSUPPORTED_MEDIA_TYPE,
+          'UNSUPPORTED_IMAGE_FORMAT',
+        ),
+      );
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+});
+
 function forwardStaticMetricsError(error: unknown, next: NextFunction): void {
   if (
     typeof error === 'object' &&
@@ -79,11 +106,13 @@ function forwardStaticMetricsError(error: unknown, next: NextFunction): void {
     typeof error.meta.table === 'string' &&
     error.meta.table.includes('static_pattern_metrics')
   ) {
-    next(new AppError(
-      'La table des statistiques de motifs statiques est absente. Exécutez « npx prisma migrate deploy » depuis avs-backend.',
-      StatusCodes.SERVICE_UNAVAILABLE,
-      'STATIC_PATTERN_METRICS_MIGRATION_REQUIRED',
-    ));
+    next(
+      new AppError(
+        'La table des statistiques de motifs statiques est absente. Exécutez « npx prisma migrate deploy » depuis avs-backend.',
+        StatusCodes.SERVICE_UNAVAILABLE,
+        'STATIC_PATTERN_METRICS_MIGRATION_REQUIRED',
+      ),
+    );
     return;
   }
 
@@ -116,16 +145,18 @@ const SymbolSchema = z.object({
   imageUrl: z.string().url('Invalid image URL').optional(),
 });
 
-const SymbolisimSchema =z.object({
-  meaning: z.string().min(10,"symbolism meaning is requierd").max(512),
-  keywords:z.array(z.string().min(1)).min(1,"at least one keyword is requierd").max(10),
-  usage: z.enum(['ceremonial', 'daily', 'royal', 'spiritual', 'universal'])
-})
+const SymbolisimSchema = z.object({
+  meaning: z.string().min(10, 'symbolism meaning is requierd').max(512),
+  keywords: z.array(z.string().min(1)).min(1, 'at least one keyword is requierd').max(10),
+  usage: z.enum(['ceremonial', 'daily', 'royal', 'spiritual', 'universal']),
+});
 const CreateSchema = z.object({
   // Step 1: Identity
   nameLocal: z.string().min(2, 'Minimum 2 characters').max(128),
   nameEn: z.string().min(2, 'Minimum 2 characters').max(128),
-  patternType: z.enum(['kente', 'bogolan', 'adinkra', 'ndebele', 'kuba', 'ndop', 'wax', 'berber']).transform(val => val.toUpperCase() as PatternType),
+  patternType: z
+    .enum(['kente', 'bogolan', 'adinkra', 'ndebele', 'kuba', 'ndop', 'wax', 'berber'])
+    .transform((val) => val.toUpperCase() as PatternType),
   region: z.enum([
     'west-africa',
     'east-africa',
@@ -147,14 +178,13 @@ const CreateSchema = z.object({
   history: z.string().min(10, 'History must be at least 10 characters').max(2000),
   technique: z.string().min(10, 'Technique must be at least 10 characters').max(1000),
   ceremonial: z.string().min(10, 'Ceremonial usage must be at least 10 characters').max(1000),
-  
 
   // Step 3: Colors & Assets
   colors: z.array(ColorSchema).min(2, 'At least 2 colors required').max(5),
   artisanQuote: ArtisanQuoteSchema,
   sources: z.array(z.string().min(1)).min(1, 'At least one source required').max(10),
   symbols: z.array(SymbolSchema).min(1, 'At least one symbol required').max(20),
-  symbolism:SymbolisimSchema
+  symbolism: SymbolisimSchema,
 });
 
 const QuerySchema = z.object({
@@ -170,8 +200,33 @@ const QuerySchema = z.object({
       'diaspora',
     ])
     .optional(),
-  patternType: z.enum(['kente', 'bogolan', 'adinkra', 'ndebele', 'kuba', 'ndop', 'wax', 'berber']).optional(),
+  patternType: z
+    .enum(['kente', 'bogolan', 'adinkra', 'ndebele', 'kuba', 'ndop', 'wax', 'berber'])
+    .optional(),
   search: z.string().max(128).optional(),
+});
+
+const CreateSymbolSchema = z.object({
+  name: z.string().trim().min(2).max(128),
+  nameFr: z.string().trim().min(2).max(128),
+  cssPreview: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+  imageUrl: z.union([z.string().url(), z.literal('')]).default(''),
+  meaning: z.string().trim().min(10).max(2000),
+  usage: z.string().trim().min(3).max(1000),
+  sacred: z
+    .preprocess(
+      (value) => (value === 'true' ? true : value === 'false' ? false : value),
+      z.boolean(),
+    )
+    .default(false),
+});
+
+const UpdateSymbolSchema = CreateSymbolSchema.partial().refine(
+  (data) => Object.keys(data).length > 0,
+  'Au moins un champ doit être renseigné',
+);
+const UpdateSymbolStatusSchema = z.object({
+  status: z.enum(['DRAFT', 'PUBLISHED', 'REVIEW', 'REJECTED']),
 });
 
 // ── Factory — injection du service ───────────────────────────────────────────
@@ -179,9 +234,207 @@ export class CultureController {
   constructor(private readonly service: CultureService) {}
 
   private storage = createStorageService();
+
+  listSymbols = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const symbols = await this.service.listPublishedSymbols();
+      res.json(ok(symbols, 'Symboles publiés récupérés avec succès'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listManagedSymbols = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const symbols = await this.service.listSymbols(req.user?.userId, req.user?.role);
+      res.json(ok(symbols, 'Symboles récupérés avec succès'));
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  createSymbol = async (
+    req: Request<{ patternId?: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const data = CreateSymbolSchema.parse(req.body);
+      let uploadedImage: Awaited<ReturnType<typeof this.storage.upload>> | undefined;
+      if (req.file) {
+        req.file.originalname = `symbol${allowedSymbolImageTypes[req.file.mimetype]}`;
+        uploadedImage = await this.storage.upload(req.file, 'symbols');
+      }
+
+      let symbol;
+      try {
+        symbol = await this.service.createSymbol(
+          req.params.patternId ?? null,
+          {
+            ...data,
+            ...(uploadedImage && { imageUrl: uploadedImage.url, imageKey: uploadedImage.key }),
+          },
+          req.user!.userId,
+          req.user?.role ?? '',
+        );
+      } catch (error) {
+        if (uploadedImage) await this.storage.delete(uploadedImage.key);
+        throw error;
+      }
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'CREATED',
+        targetId: symbol.id,
+        targetType: 'SYMBOL',
+        targetName: symbol.name,
+        details: { patternId: symbol.patternId },
+      });
+      res.status(StatusCodes.CREATED).json(ok(symbol, 'Symbole créé avec succès'));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+          success: false,
+          message: 'Validation failed',
+          errors: err.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        });
+        return;
+      }
+      next(err);
+    }
+  };
+
+  updateSymbol = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const data = UpdateSymbolSchema.parse(req.body);
+      const role = req.user?.role ?? '';
+      const requesterId = req.user!.userId;
+      const existing = req.file
+        ? await this.service.getSymbolById(req.params.id, requesterId, role)
+        : null;
+      let uploadedImage: Awaited<ReturnType<typeof this.storage.upload>> | undefined;
+      if (req.file) {
+        req.file.originalname = `symbol${allowedSymbolImageTypes[req.file.mimetype]}`;
+        uploadedImage = await this.storage.upload(req.file, 'symbols');
+      }
+
+      let symbol;
+      try {
+        symbol = await this.service.updateSymbol(
+          req.params.id,
+          {
+            ...data,
+            ...(uploadedImage && { imageUrl: uploadedImage.url, imageKey: uploadedImage.key }),
+          },
+          requesterId,
+          role,
+        );
+      } catch (error) {
+        if (uploadedImage) await this.storage.delete(uploadedImage.key);
+        throw error;
+      }
+
+      if (uploadedImage && existing?.imageKey) {
+        await this.storage.delete(existing.imageKey);
+      }
+      await logPlatformActivity({
+        userId: requesterId,
+        action: 'UPDATED',
+        targetId: symbol.id,
+        targetType: 'SYMBOL',
+        targetName: symbol.name,
+      });
+      res.json(ok(symbol, 'Symbole mis à jour avec succès'));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+          success: false,
+          message: 'Validation failed',
+          errors: err.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        });
+        return;
+      }
+      next(err);
+    }
+  };
+
+  removeSymbol = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const requesterId = req.user!.userId;
+      const role = req.user?.role ?? '';
+      const existing = await this.service.getSymbolById(req.params.id, requesterId, role);
+      await this.service.deleteSymbol(req.params.id, requesterId, role);
+      if (existing.imageKey) await this.storage.delete(existing.imageKey);
+      await logPlatformActivity({
+        userId: requesterId,
+        action: 'DELETED',
+        targetId: existing.id,
+        targetType: 'SYMBOL',
+        targetName: existing.name,
+      });
+      res.status(StatusCodes.NO_CONTENT).send();
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  updateSymbolStatus = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { status } = UpdateSymbolStatusSchema.parse(req.body);
+      const symbol = await this.service.updateSymbolStatus(
+        req.params.id,
+        status,
+        req.user?.role ?? '',
+      );
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: status === 'PUBLISHED' ? 'PUBLISHED' : 'REVIEWED',
+        targetId: symbol.id,
+        targetType: 'SYMBOL',
+        targetName: symbol.name,
+        details: { status },
+      });
+      res.json(ok(symbol, 'Statut du symbole mis à jour avec succès'));
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+          success: false,
+          message: 'Validation failed',
+          errors: err.issues.map((issue) => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+          })),
+        });
+        return;
+      }
+      next(err);
+    }
+  };
+
   list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { page = '1', perPage = '20', search } = req.query as Record<string, string | undefined>;
+      const {
+        page = '1',
+        perPage = '20',
+        search,
+      } = req.query as Record<string, string | undefined>;
       const userId = req.user?.userId;
       const userRole = req.user?.role;
 
@@ -212,10 +465,7 @@ export class CultureController {
 
         if (where.OR) {
           // Combiner avec le filtre de rôle existant
-          where.AND = [
-            { OR: where.OR },
-            searchCondition,
-          ];
+          where.AND = [{ OR: where.OR }, searchCondition];
           delete where.OR;
         } else {
           Object.assign(where, searchCondition);
@@ -228,7 +478,13 @@ export class CultureController {
           skip,
           take: perPageNum,
           orderBy: { createdAt: 'desc' },
-          include: { origin: true, colors: true, symbols: true, artisanQuote: true ,symbolism:true},
+          include: {
+            origin: true,
+            colors: true,
+            symbols: true,
+            artisanQuote: true,
+            symbolism: true,
+          },
         }),
         db.pattern.count({ where }),
       ]);
@@ -249,7 +505,7 @@ export class CultureController {
     try {
       const pattern = await db.pattern.findUnique({
         where: { slug: req.params.slug },
-        include: { origin: true, colors: true, symbols: true, artisanQuote: true ,symbolism:true},
+        include: { origin: true, colors: true, symbols: true, artisanQuote: true, symbolism: true },
       });
 
       if (!pattern) {
@@ -258,7 +514,30 @@ export class CultureController {
       }
 
       if (pattern.status !== 'PUBLISHED') {
-        res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+        const requesterId = req.user?.userId;
+        const requesterRole = String(req.user?.role ?? '').toLowerCase();
+        const canInspectUnpublished =
+          requesterId === pattern.createdById ||
+          requesterRole === 'admin' ||
+          requesterRole === 'super_admin';
+
+        if (!canInspectUnpublished) {
+          res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+          return;
+        }
+
+        const updatedPattern = await db.pattern.update({
+          where: { id: pattern.id },
+          data: { views: { increment: 1 } },
+          include: {
+            origin: true,
+            colors: true,
+            symbols: true,
+            artisanQuote: true,
+            symbolism: true,
+          },
+        });
+        res.json(ok(PatternListResponseMapper.toPatternDoc(updatedPattern)));
         return;
       }
 
@@ -299,10 +578,8 @@ export class CultureController {
 
   create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      
       const formData: any = {};
 
-      
       for (const [key, value] of Object.entries(req.body)) {
         if (value === undefined || value === null) continue;
 
@@ -395,7 +672,7 @@ export class CultureController {
         imgUrl: formData.svgFilePath || '',
         type: validatedData.patternType.toUpperCase() as any,
         cssClass: validatedData.patternType.toLowerCase(),
-        format: formData.svgFilePath ? 'SVG' as const : 'CSS' as const,
+        format: formData.svgFilePath ? ('SVG' as const) : ('CSS' as const),
         era: validatedData.era,
         license: validatedData.license,
         summary: validatedData.summary,
@@ -407,17 +684,28 @@ export class CultureController {
         createdById: req.user!.userId,
         colors: validatedData.colors,
         symbols: validatedData.symbols,
-        origin: validatedData.region && validatedData.country ? {
-          people: validatedData.people || '',
-          region: validatedData.region,
-          country: validatedData.country,
-          flag: validatedData.flag || '',
-          coords: validatedData.coords || [0, 0],
-        } : undefined,
+        origin:
+          validatedData.region && validatedData.country
+            ? {
+                people: validatedData.people || '',
+                region: validatedData.region,
+                country: validatedData.country,
+                flag: validatedData.flag || '',
+                coords: validatedData.coords || [0, 0],
+              }
+            : undefined,
         artisanQuote: validatedData.artisanQuote,
       };
 
       const result = await this.service.createPattern(serviceDto);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'CREATED',
+        targetId: result.id,
+        targetType: 'PATTERN',
+        targetName: result.name ?? result.nameLocal,
+        details: { status: result.status },
+      });
       logger.info(`Pattern created: ${result.id} - ${result.name}`);
 
       res
@@ -561,7 +849,7 @@ export class CultureController {
       if (validatedData.sources) serviceDto.sources = validatedData.sources;
       if (formData.svgFilePath) serviceDto.imgUrl = formData.svgFilePath;
       if (formData.svgFilePath) serviceDto.format = 'SVG';
-      
+
       // Map origin if provided
       if (validatedData.region && validatedData.country) {
         serviceDto.origin = {
@@ -572,17 +860,20 @@ export class CultureController {
           coords: validatedData.coords || [0, 0],
         };
       }
-      
+
       // Map other optional fields
       if (validatedData.colors) serviceDto.colors = validatedData.colors;
       if (validatedData.symbols) serviceDto.symbols = validatedData.symbols;
       if (validatedData.artisanQuote) serviceDto.artisanQuote = validatedData.artisanQuote;
 
-      const result = await this.service.updatePattern(
-        req.params.id,
-        serviceDto,
-        req.user!.role,
-      );
+      const result = await this.service.updatePattern(req.params.id, serviceDto, req.user!.role);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'UPDATED',
+        targetId: result.id,
+        targetType: 'PATTERN',
+        targetName: result.name ?? result.nameLocal,
+      });
       logger.info(`Pattern updated: ${result.id} - ${result.name}`);
 
       res.json(ok(result.toObject(), 'Pattern updated successfully'));
@@ -610,11 +901,15 @@ export class CultureController {
   ): Promise<void> => {
     try {
       const { status } = req.body;
-      const pattern = await this.service.updatePatternStatus(
-        req.params.id,
-        status,
-        req.user!.role,
-      );
+      const pattern = await this.service.updatePatternStatus(req.params.id, status, req.user!.role);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: pattern.status === 'PUBLISHED' ? 'PUBLISHED' : 'REVIEWED',
+        targetId: pattern.id,
+        targetType: 'PATTERN',
+        targetName: pattern.name ?? pattern.nameLocal,
+        details: { status: pattern.status },
+      });
       res.json(ok(pattern.toObject(), 'Statut mis à jour'));
     } catch (err) {
       next(err);
@@ -631,7 +926,17 @@ export class CultureController {
       const pattern = featured
         ? await this.service.featurePattern(req.params.id, req.user!.role)
         : await this.service.unfeaturePattern(req.params.id, req.user!.role);
-      res.json(ok(pattern.toObject(), featured ? 'Motif mis en vedette' : 'Motif retiré des vedettes'));
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'UPDATED',
+        targetId: pattern.id,
+        targetType: 'PATTERN',
+        targetName: pattern.name ?? pattern.nameLocal,
+        details: { featured },
+      });
+      res.json(
+        ok(pattern.toObject(), featured ? 'Motif mis en vedette' : 'Motif retiré des vedettes'),
+      );
     } catch (err) {
       next(err);
     }
@@ -643,7 +948,15 @@ export class CultureController {
     next: NextFunction,
   ): Promise<void> => {
     try {
+      const pattern = await this.service.getPatternForDownload(req.params.id);
       await this.service.deletePattern(req.params.id, req.user!.role);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'DELETED',
+        targetId: pattern.id,
+        targetType: 'PATTERN',
+        targetName: pattern.name ?? pattern.nameLocal,
+      });
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);
@@ -719,7 +1032,14 @@ export class CultureController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      if (isStaticPatternSlug(req.params.id)) {
+      let pattern;
+      try {
+        pattern = await this.service.getPatternForDownload(req.params.id);
+      } catch (err) {
+        if (!(err instanceof NotFoundError) || !isStaticPatternSlug(req.params.id)) {
+          throw err;
+        }
+
         const staticPattern = STATIC_PATTERN_EXPORTS[req.params.id];
         const svgContent = generateVectorSvgFromCss({
           id: req.params.id,
@@ -727,7 +1047,7 @@ export class CultureController {
           slug: req.params.id,
           type: staticPattern.type,
           cssClass: staticPattern.type.toLowerCase(),
-          colors: staticPattern.colors.map(hex => ({ hex })),
+          colors: staticPattern.colors.map((hex) => ({ hex })),
         });
         const fileBuffer = Buffer.from(svgContent, 'utf-8');
         await db.staticPatternMetric.upsert({
@@ -741,7 +1061,6 @@ export class CultureController {
         return;
       }
 
-      const pattern = await this.service.getPatternForDownload(req.params.id);
       if (pattern.status !== 'PUBLISHED') {
         res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
         return;
@@ -750,15 +1069,21 @@ export class CultureController {
 
       if (pattern.svgContent) {
         fileBuffer = Buffer.from(pattern.svgContent, 'utf-8');
-      } else if (pattern.imgUrl && pattern.imgUrl.includes('/patterns/')) {
-        const urlParts = pattern.imgUrl.split('/patterns/');
-        if (urlParts[1]) {
-          fileBuffer = await this.storage.download(urlParts[1]);
+      } else if (pattern.imgUrl) {
+        const storageKey = extractStorageKeyFromUrl(pattern.imgUrl);
+        if (storageKey) {
+          fileBuffer = await this.storage.download(storageKey);
+        } else if (pattern.format === 'SVG') {
+          throw new AppError(
+            'Le fichier SVG enregistré ne peut pas être retrouvé depuis son URL de stockage.',
+            StatusCodes.BAD_GATEWAY,
+            'PATTERN_ASSET_UNAVAILABLE',
+          );
         }
       }
 
       // Generer un document SVG vectoriel natif et valide pour l'export (Figma, Illustrator, Web)
-      if (!fileBuffer) {
+      if (!fileBuffer && pattern.format !== 'SVG') {
         const svgContent = generateVectorSvgFromCss({
           id: pattern.id,
           name: pattern.name || 'Motif AVS',
@@ -772,7 +1097,14 @@ export class CultureController {
         });
         fileBuffer = Buffer.from(svgContent, 'utf-8');
       }
-      
+      if (!fileBuffer) {
+        throw new AppError(
+          'Aucun fichier SVG ni contenu vectoriel exploitable n’est disponible pour ce motif.',
+          StatusCodes.UNPROCESSABLE_ENTITY,
+          'PATTERN_SVG_UNAVAILABLE',
+        );
+      }
+
       // Increment download counter atomically in DB
       await db.pattern.update({
         where: { id: pattern.id },
@@ -796,7 +1128,10 @@ export class CultureController {
 
       // Send SVG file attachment
       res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="${pattern.slug || 'motif-avs'}.svg"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${pattern.slug || 'motif-avs'}.svg"`,
+      );
       res.send(fileBuffer);
     } catch (err) {
       forwardStaticMetricsError(err, next);
@@ -811,12 +1146,32 @@ export class CultureController {
     try {
       const pattern = await db.pattern.findFirst({
         where: { OR: [{ id: req.params.id }, { slug: req.params.id }] },
-        select: { id: true, status: true },
+        select: { id: true, status: true, createdById: true, views: true, downloads: true },
       });
 
       if (pattern) {
         if (pattern.status !== 'PUBLISHED') {
-          res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
+          const requesterId = req.user?.userId;
+          const requesterRole = String(req.user?.role ?? '').toLowerCase();
+          const canInspectUnpublished =
+            requesterId === pattern.createdById ||
+            requesterRole === 'admin' ||
+            requesterRole === 'super_admin' ||
+            requesterRole === 'curator';
+
+          if (!canInspectUnpublished) {
+            res
+              .status(StatusCodes.NOT_FOUND)
+              .json({ success: false, message: 'Pattern not found' });
+            return;
+          }
+
+          const updated = await db.pattern.update({
+            where: { id: pattern.id },
+            data: { views: { increment: 1 } },
+            select: { views: true, downloads: true },
+          });
+          res.json(ok(updated, 'View incremented successfully'));
           return;
         }
         const updated = await db.pattern.update({
@@ -853,13 +1208,25 @@ export class CultureController {
     try {
       const pattern = await db.pattern.findFirst({
         where: { OR: [{ id: req.params.slug }, { slug: req.params.slug }] },
-        select: { status: true, views: true, downloads: true },
+        select: { status: true, views: true, downloads: true, createdById: true },
       });
 
       if (pattern) {
         if (pattern.status !== 'PUBLISHED') {
-          res.status(StatusCodes.NOT_FOUND).json({ success: false, message: 'Pattern not found' });
-          return;
+          const requesterId = req.user?.userId;
+          const requesterRole = String(req.user?.role ?? '').toLowerCase();
+          const canInspectUnpublished =
+            requesterId === pattern.createdById ||
+            requesterRole === 'admin' ||
+            requesterRole === 'super_admin' ||
+            requesterRole === 'curator';
+
+          if (!canInspectUnpublished) {
+            res
+              .status(StatusCodes.NOT_FOUND)
+              .json({ success: false, message: 'Pattern not found' });
+            return;
+          }
         }
         res.json(ok({ views: pattern.views, downloads: pattern.downloads }));
         return;

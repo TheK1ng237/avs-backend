@@ -4,10 +4,7 @@ import { PrismaClient, Activity } from '@prisma/client';
 export class PrismaActivityRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async findByUser(
-    userId: string,
-    params?: { skip?: number; take?: number }
-  ): Promise<Activity[]> {
+  async findByUser(userId: string, params?: { skip?: number; take?: number }): Promise<Activity[]> {
     return this.db.activity.findMany({
       where: { userId },
       skip: params?.skip,
@@ -26,41 +23,110 @@ export class PrismaActivityRepository {
 
   async getGlobalStats(): Promise<{
     totalPatterns: number;
-    totalUsers: number;
     totalArtisans: number;
     totalDownloads: number;
+    totalViews: number;
+    totalCountries: number;
+    totalSymbols: number;
   }> {
-    const [totalPatterns, totalUsers, totalArtisans, stats] = await Promise.all([
-      this.db.pattern.count(),
-      this.db.user.count(),
-      this.db.artisan.count(),
+    const publishedPatternWhere = { status: 'PUBLISHED' as const };
+    const [totalPatterns, totalArtisans, stats, totalCountries, totalSymbols] = await Promise.all([
+      this.db.pattern.count({ where: publishedPatternWhere }),
+      this.db.artisan.count({ where: { verified: true } }),
       this.db.pattern.aggregate({
-        _sum: { downloads: true },
+        where: publishedPatternWhere,
+        _sum: { downloads: true, views: true },
       }),
+      this.db.origin.findMany({
+        where: { pattern: publishedPatternWhere },
+        distinct: ['country'],
+        select: { country: true },
+      }),
+      this.db.symbol.count({ where: { pattern: publishedPatternWhere } }),
     ]);
 
     return {
       totalPatterns,
-      totalUsers,
       totalArtisans,
       totalDownloads: stats._sum?.downloads ?? 0,
+      totalViews: stats._sum?.views ?? 0,
+      totalCountries: totalCountries.length,
+      totalSymbols,
     };
   }
 
-  async findGlobal(params?: { skip?: number; take?: number }): Promise<Activity[]> {
-    return this.db.activity.findMany({
+  async getUserStats(userId: string): Promise<{
+    total: number;
+    downloads: number;
+    favorites: number;
+    comments: number;
+    reviews: number;
+  }> {
+    const [total, actions] = await Promise.all([
+      this.db.activity.count({ where: { userId } }),
+      this.db.activity.groupBy({
+        by: ['action'],
+        where: { userId },
+        _count: true,
+      }),
+    ]);
+
+    const counts = new Map(actions.map(({ action, _count }) => [action, _count]));
+    return {
+      total,
+      downloads: counts.get('DOWNLOADED') ?? 0,
+      favorites: counts.get('FAVORITED') ?? 0,
+      comments: counts.get('COMMENTED') ?? 0,
+      reviews: counts.get('REVIEWED') ?? 0,
+    };
+  }
+
+  async findGlobal(params?: {
+    skip?: number;
+    take?: number;
+  }): Promise<Array<Activity & { target?: string; actorName: string | null; actorEmail: string }>> {
+    const activities = await this.db.activity.findMany({
       skip: params?.skip,
       take: params?.take ?? 20,
       orderBy: { createdAt: 'desc' },
       include: {
         user: {
           select: {
-            id: true,
             name: true,
             email: true,
           },
         },
       },
+    });
+
+    const patternIds = activities
+      .filter((activity) => activity.targetType.toLocaleLowerCase() === 'pattern')
+      .map((activity) => activity.targetId);
+    const patterns = patternIds.length
+      ? await this.db.pattern.findMany({
+          where: { id: { in: patternIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const patternNames = new Map(patterns.map((pattern) => [pattern.id, pattern.name]));
+
+    return activities.map((activity) => {
+      const metadata =
+        activity.metadata &&
+        typeof activity.metadata === 'object' &&
+        !Array.isArray(activity.metadata)
+          ? (activity.metadata as Record<string, unknown>)
+          : {};
+      const targetName =
+        (typeof metadata.targetName === 'string' && metadata.targetName) ||
+        patternNames.get(activity.targetId) ||
+        activity.targetId;
+      return {
+        ...activity,
+        target: targetName,
+        actorName: activity.user.name,
+        actorEmail: activity.user.email,
+      };
     });
   }
 }

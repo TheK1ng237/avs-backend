@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PaletteService } from '@/modules/palette/application/palette.service';
 import { ok } from '@/shared/types/api.types';
 import { StatusCodes } from 'http-status-codes';
+import { logPlatformActivity } from '@/modules/activity/log-platform-activity';
 
 const ColorTokenSchema = z.object({
   name: z.string().min(2).max(64),
@@ -38,7 +39,11 @@ export class PaletteController {
     }
   };
 
-  getById = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
+  getById = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const id = req.params.id;
       const palette = await this.service.getPaletteById(id);
@@ -52,37 +57,78 @@ export class PaletteController {
     try {
       const data = CreateSchema.parse(req.body);
       const palette = await this.service.createPalette(data);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'CREATED',
+        targetId: palette.id,
+        targetType: 'PALETTE',
+        targetName: palette.name,
+      });
       res.status(StatusCodes.CREATED).json(ok(palette, 'Palette created'));
     } catch (err) {
       next(err);
     }
   };
 
-  update = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
+  update = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const id = req.params.id;
       const data = CreateSchema.partial().parse(req.body);
       const palette = await this.service.updatePalette(id, data);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'UPDATED',
+        targetId: palette.id,
+        targetType: 'PALETTE',
+        targetName: palette.name,
+      });
       res.json(ok(palette, 'Palette updated'));
     } catch (err) {
       next(err);
     }
   };
 
-  publish = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
+  publish = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const id = req.params.id;
       const palette = await this.service.publishPalette(id);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'PUBLISHED',
+        targetId: palette.id,
+        targetType: 'PALETTE',
+        targetName: palette.name,
+      });
       res.json(ok(palette, 'Palette published'));
     } catch (err) {
       next(err);
     }
   };
 
-  delete = async (req: Request<{ id: string }>, res: Response, next: NextFunction): Promise<void> => {
+  delete = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const id = req.params.id;
+      const palette = await this.service.getPaletteById(id);
       await this.service.deletePalette(id);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'DELETED',
+        targetId: palette.id,
+        targetType: 'PALETTE',
+        targetName: palette.name,
+      });
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);

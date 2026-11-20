@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { ActivityController } from '@/modules/activity/activity.controller';
 import { ActivityService } from '@/modules/activity/application/activity.service';
 import { PrismaActivityRepository } from '@/modules/activity/infrastructure/PrismaActivityRepository';
-import { authenticate } from '@/shared/middlewares/auth.middleware';
+import { authenticate, requireSuperAdmin } from '@/shared/middlewares/auth.middleware';
 import { publicApiRateLimiter } from '@/shared/middlewares/security.middleware';
 import { db } from '@/infra/database/database';
 
@@ -12,6 +12,34 @@ const router = Router();
 const repository = new PrismaActivityRepository(db);
 const service = new ActivityService(repository);
 const controller = new ActivityController(service);
+
+/**
+ * @swagger
+ * /api/v1/activities/stats:
+ *   get:
+ *     summary: Get public platform totals from published records
+ *     tags: [Activities]
+ *     responses:
+ *       200:
+ *         description: Platform totals for patterns, countries, artisans, downloads, views and symbols
+ */
+router.get('/stats', publicApiRateLimiter, controller.getGlobalStats);
+
+/**
+ * @swagger
+ * /api/v1/activities/me/stats:
+ *   get:
+ *     summary: Get activity totals for the authenticated user
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User activity totals by type
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.get('/me/stats', authenticate, controller.getUserStats);
 
 /**
  * @swagger
@@ -40,7 +68,7 @@ router.get('/', authenticate, controller.getUserActivity);
  * @swagger
  * /api/v1/activities/global:
  *   get:
- *     summary: Get global platform activity
+ *     summary: Get global platform activity (super admin only)
  *     tags: [Activities]
  *     security:
  *       - bearerAuth: []
@@ -56,7 +84,9 @@ router.get('/', authenticate, controller.getUserActivity);
  *         description: Global activity feed
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         $ref: '#/components/responses/Forbidden'
  */
-router.get('/global', authenticate, controller.getGlobalActivity);
+router.get('/global', authenticate, requireSuperAdmin, controller.getGlobalActivity);
 
 export default router;

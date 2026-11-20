@@ -49,7 +49,7 @@ export class PatternListResponseMapper {
         usage:pattern.symbolism?.usage ?? ""
       },
       ceremonial: pattern.ceremonial,
-      symbols: (pattern.symbols as unknown as PatternSymbol[]) ?? [],
+      symbols: (pattern.symbols.filter((symbol) => symbol.status === 'PUBLISHED') as unknown as PatternSymbol[]) ?? [],
       artisanQuote: pattern.artisanQuote
         ? {
             text: pattern.artisanQuote.text,

@@ -8,6 +8,7 @@ import { UserService } from '@/modules/user/application/user.service';
 import { ok } from '@/shared/types/api.types';
 import { StatusCodes } from 'http-status-codes';
 import { createStorageService } from '@/infra/storage/storage.factory';
+import { logPlatformActivity } from '@/modules/activity/log-platform-activity';
 
 // ── Multer configuration for avatar upload ─────────────────────────────────────
 const storage = multer.memoryStorage();
@@ -38,12 +39,14 @@ const UpdateSchema = z.object({
   avatar: z.string().optional(),
 });
 
-const RoleSchema = z.object({
-  role: z.enum(['viewer', 'contributor', 'curator', 'admin', 'super_admin']),
-}).transform((data) => ({
-  ...data,
-  role: data.role.toUpperCase() as 'VIEWER' | 'CONTRIBUTOR' | 'CURATOR' | 'ADMIN' | 'SUPER_ADMIN',
-}));
+const RoleSchema = z
+  .object({
+    role: z.enum(['viewer', 'contributor', 'curator', 'admin', 'super_admin']),
+  })
+  .transform((data) => ({
+    ...data,
+    role: data.role.toUpperCase() as 'VIEWER' | 'CONTRIBUTOR' | 'CURATOR' | 'ADMIN' | 'SUPER_ADMIN',
+  }));
 
 const VerificationSchema = z.object({
   verified: z.boolean(),
@@ -75,7 +78,11 @@ const SettingsSchema = z.object({
 
 const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(8),
-  newPassword: z.string().min(8).regex(/[A-Z]/, 'Une majuscule requise').regex(/[0-9]/, 'Un chiffre requis'),
+  newPassword: z
+    .string()
+    .min(8)
+    .regex(/[A-Z]/, 'Une majuscule requise')
+    .regex(/[0-9]/, 'Un chiffre requis'),
 });
 
 export class UserController {
@@ -156,6 +163,14 @@ export class UserController {
 
       const data = UpdateSchema.parse(req.body);
       const user = await this.service.updateUser(userId, data);
+      await logPlatformActivity({
+        userId,
+        action: 'UPDATED',
+        targetId: userId,
+        targetType: 'USER',
+        targetName: user.name || user.email,
+        details: { operation: 'profile' },
+      });
       const { passwordHash, ...safeUser } = user;
       res.json(ok(safeUser, 'User updated'));
     } catch (err) {
@@ -197,6 +212,14 @@ export class UserController {
 
       // Update user avatar URL
       const user = await this.service.updateUser(userId, { avatar: uploadResult.url });
+      await logPlatformActivity({
+        userId,
+        action: 'UPDATED',
+        targetId: userId,
+        targetType: 'USER',
+        targetName: user.name || user.email,
+        details: { operation: 'avatar_updated' },
+      });
       const { passwordHash, ...safeUser } = user;
 
       res.json(ok(safeUser, 'Avatar uploaded successfully'));
@@ -209,10 +232,7 @@ export class UserController {
   getAllUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { search, role } = req.query;
-      const users = await this.service.getAllUsers(
-        search as string ,
-        role as string 
-      );
+      const users = await this.service.getAllUsers(search as string, role as string);
       const safeUsers = users.map((user) => {
         const { passwordHash, ...safeUser } = user;
         return safeUser;
@@ -229,6 +249,14 @@ export class UserController {
       const { role } = RoleSchema.parse(req.body);
 
       const user = await this.service.updateUserRole(userId as string, role);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'UPDATED',
+        targetId: user.id,
+        targetType: 'USER',
+        targetName: user.name || user.email,
+        details: { operation: 'role_changed', assignedRole: user.role },
+      });
       const { passwordHash, ...safeUser } = user;
 
       res.json(ok(safeUser, 'User role updated'));
@@ -237,12 +265,24 @@ export class UserController {
     }
   };
 
-  toggleUserVerification = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  toggleUserVerification = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const { userId } = req.params;
       const { verified } = VerificationSchema.parse(req.body);
 
       const user = await this.service.toggleUserVerification(userId as string, verified);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'UPDATED',
+        targetId: user.id,
+        targetType: 'USER',
+        targetName: user.name || user.email,
+        details: { operation: 'verification_changed', verified },
+      });
       const { passwordHash, ...safeUser } = user;
 
       res.json(ok(safeUser, 'User verification updated'));
@@ -279,6 +319,14 @@ export class UserController {
 
       const data = BecomeCuratorSchema.parse(req.body);
       const user = await this.service.becomeCurator(userId, data);
+      await logPlatformActivity({
+        userId,
+        action: 'UPDATED',
+        targetId: user.id,
+        targetType: 'USER',
+        targetName: user.name || user.email,
+        details: { operation: 'curator_application' },
+      });
       const { passwordHash, ...safeUser } = user;
 
       res.json(ok(safeUser, 'User promoted to curator'));
@@ -312,6 +360,14 @@ export class UserController {
 
       const data = SettingsSchema.parse(req.body);
       const user = await this.service.updateSettings(userId, data);
+      await logPlatformActivity({
+        userId,
+        action: 'UPDATED',
+        targetId: userId,
+        targetType: 'USER',
+        targetName: user.name || user.email,
+        details: { operation: 'settings_updated' },
+      });
       const { passwordHash, ...safeUser } = user;
 
       res.json(ok(safeUser, 'Settings updated'));
@@ -330,6 +386,14 @@ export class UserController {
 
       const data = ChangePasswordSchema.parse(req.body);
       await this.service.changePassword(userId, data);
+      await logPlatformActivity({
+        userId,
+        action: 'UPDATED',
+        targetId: userId,
+        targetType: 'USER',
+        targetName: req.user?.email ?? userId,
+        details: { operation: 'password_changed' },
+      });
 
       res.json(ok(null, 'Password changed successfully'));
     } catch (err) {

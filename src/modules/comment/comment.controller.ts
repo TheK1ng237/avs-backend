@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CommentService } from '@/modules/comment/application/comment.service';
 import { ok } from '@/shared/types/api.types';
 import { StatusCodes } from 'http-status-codes';
+import { logPlatformActivity } from '@/modules/activity/log-platform-activity';
 
 const CreateSchema = z.object({
   content: z.string().min(1).max(2000),
@@ -32,8 +33,16 @@ export class CommentController {
         userId,
         patternId || null,
         artisanId || null,
-        data
+        data,
       );
+      await logPlatformActivity({
+        userId,
+        action: 'COMMENTED',
+        targetId: comment.id,
+        targetType: 'COMMENT',
+        targetName: patternId ? 'commentaire sur un motif' : 'commentaire sur un artisan',
+        details: { patternId: patternId || null, artisanId: artisanId || null },
+      });
 
       res.status(StatusCodes.CREATED).json(ok(comment, 'Comment added'));
     } catch (err) {
@@ -46,10 +55,14 @@ export class CommentController {
       const query = QuerySchema.parse(req.query);
       const { patternId, artisanId } = req.params as any;
 
-      const result = await this.service.getComments(patternId || undefined, artisanId || undefined, {
-        page: query.page,
-        perPage: query.perPage,
-      });
+      const result = await this.service.getComments(
+        patternId || undefined,
+        artisanId || undefined,
+        {
+          page: query.page,
+          perPage: query.perPage,
+        },
+      );
 
       res.json(ok(result.items, 'Comments retrieved', result.meta));
     } catch (err) {
@@ -57,7 +70,11 @@ export class CommentController {
     }
   };
 
-  deleteComment = async (req: Request<{id:string}>, res: Response, next: NextFunction): Promise<void> => {
+  deleteComment = async (
+    req: Request<{ id: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const userId = req.user?.userId;
       if (!userId) {
@@ -65,12 +82,21 @@ export class CommentController {
         return;
       }
 
-      const commentId = req.params.id ;
+      const commentId = req.params.id;
       if (!commentId) {
-        res.status(StatusCodes.BAD_REQUEST).json({ success: false, message: 'Comment ID is required' });
+        res
+          .status(StatusCodes.BAD_REQUEST)
+          .json({ success: false, message: 'Comment ID is required' });
         return;
       }
       await this.service.deleteComment(commentId, userId);
+      await logPlatformActivity({
+        userId,
+        action: 'DELETED',
+        targetId: commentId,
+        targetType: 'COMMENT',
+        targetName: 'commentaire',
+      });
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);
