@@ -13,6 +13,7 @@ import { createStorageService } from '@/infra/storage/storage.factory';
 import { extractStorageKeyFromUrl } from '@/infra/storage/storageUrl';
 import { PatternListResponseMapper } from './dto/PatternListResponse.mapper';
 import { db } from '@/infra/database/database';
+import { logPlatformActivity } from '@/modules/activity/log-platform-activity';
 import { generateVectorSvgFromCss } from './utils/svgExporter';
 import { isStaticPatternSlug, STATIC_PATTERN_EXPORTS } from './staticPatternRegistry';
 import { AppError, NotFoundError } from '@/shared/errors/AppError';
@@ -280,6 +281,14 @@ export class CultureController {
         if (uploadedImage) await this.storage.delete(uploadedImage.key);
         throw error;
       }
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'CREATED',
+        targetId: symbol.id,
+        targetType: 'SYMBOL',
+        targetName: symbol.name,
+        details: { patternId: symbol.patternId },
+      });
       res.status(StatusCodes.CREATED).json(ok(symbol, 'Symbole créé avec succès'));
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -334,6 +343,13 @@ export class CultureController {
       if (uploadedImage && existing?.imageKey) {
         await this.storage.delete(existing.imageKey);
       }
+      await logPlatformActivity({
+        userId: requesterId,
+        action: 'UPDATED',
+        targetId: symbol.id,
+        targetType: 'SYMBOL',
+        targetName: symbol.name,
+      });
       res.json(ok(symbol, 'Symbole mis à jour avec succès'));
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -362,6 +378,13 @@ export class CultureController {
       const existing = await this.service.getSymbolById(req.params.id, requesterId, role);
       await this.service.deleteSymbol(req.params.id, requesterId, role);
       if (existing.imageKey) await this.storage.delete(existing.imageKey);
+      await logPlatformActivity({
+        userId: requesterId,
+        action: 'DELETED',
+        targetId: existing.id,
+        targetType: 'SYMBOL',
+        targetName: existing.name,
+      });
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);
@@ -380,6 +403,14 @@ export class CultureController {
         status,
         req.user?.role ?? '',
       );
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: status === 'PUBLISHED' ? 'PUBLISHED' : 'REVIEWED',
+        targetId: symbol.id,
+        targetType: 'SYMBOL',
+        targetName: symbol.name,
+        details: { status },
+      });
       res.json(ok(symbol, 'Statut du symbole mis à jour avec succès'));
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -667,6 +698,14 @@ export class CultureController {
       };
 
       const result = await this.service.createPattern(serviceDto);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'CREATED',
+        targetId: result.id,
+        targetType: 'PATTERN',
+        targetName: result.name ?? result.nameLocal,
+        details: { status: result.status },
+      });
       logger.info(`Pattern created: ${result.id} - ${result.name}`);
 
       res
@@ -828,6 +867,13 @@ export class CultureController {
       if (validatedData.artisanQuote) serviceDto.artisanQuote = validatedData.artisanQuote;
 
       const result = await this.service.updatePattern(req.params.id, serviceDto, req.user!.role);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'UPDATED',
+        targetId: result.id,
+        targetType: 'PATTERN',
+        targetName: result.name ?? result.nameLocal,
+      });
       logger.info(`Pattern updated: ${result.id} - ${result.name}`);
 
       res.json(ok(result.toObject(), 'Pattern updated successfully'));
@@ -856,6 +902,14 @@ export class CultureController {
     try {
       const { status } = req.body;
       const pattern = await this.service.updatePatternStatus(req.params.id, status, req.user!.role);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: pattern.status === 'PUBLISHED' ? 'PUBLISHED' : 'REVIEWED',
+        targetId: pattern.id,
+        targetType: 'PATTERN',
+        targetName: pattern.name ?? pattern.nameLocal,
+        details: { status: pattern.status },
+      });
       res.json(ok(pattern.toObject(), 'Statut mis à jour'));
     } catch (err) {
       next(err);
@@ -872,6 +926,14 @@ export class CultureController {
       const pattern = featured
         ? await this.service.featurePattern(req.params.id, req.user!.role)
         : await this.service.unfeaturePattern(req.params.id, req.user!.role);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'UPDATED',
+        targetId: pattern.id,
+        targetType: 'PATTERN',
+        targetName: pattern.name ?? pattern.nameLocal,
+        details: { featured },
+      });
       res.json(
         ok(pattern.toObject(), featured ? 'Motif mis en vedette' : 'Motif retiré des vedettes'),
       );
@@ -886,7 +948,15 @@ export class CultureController {
     next: NextFunction,
   ): Promise<void> => {
     try {
+      const pattern = await this.service.getPatternForDownload(req.params.id);
       await this.service.deletePattern(req.params.id, req.user!.role);
+      await logPlatformActivity({
+        userId: req.user!.userId,
+        action: 'DELETED',
+        targetId: pattern.id,
+        targetType: 'PATTERN',
+        targetName: pattern.name ?? pattern.nameLocal,
+      });
       res.status(StatusCodes.NO_CONTENT).send();
     } catch (err) {
       next(err);

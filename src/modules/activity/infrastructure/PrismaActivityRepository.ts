@@ -84,7 +84,7 @@ export class PrismaActivityRepository {
   async findGlobal(params?: {
     skip?: number;
     take?: number;
-  }): Promise<Array<Activity & { target?: string }>> {
+  }): Promise<Array<Activity & { target?: string; actorName: string | null; actorEmail: string }>> {
     const activities = await this.db.activity.findMany({
       skip: params?.skip,
       take: params?.take ?? 20,
@@ -92,7 +92,6 @@ export class PrismaActivityRepository {
       include: {
         user: {
           select: {
-            id: true,
             name: true,
             email: true,
           },
@@ -101,7 +100,7 @@ export class PrismaActivityRepository {
     });
 
     const patternIds = activities
-      .filter((activity) => ['pattern', 'Pattern'].includes(activity.targetType))
+      .filter((activity) => activity.targetType.toLocaleLowerCase() === 'pattern')
       .map((activity) => activity.targetId);
     const patterns = patternIds.length
       ? await this.db.pattern.findMany({
@@ -111,9 +110,23 @@ export class PrismaActivityRepository {
       : [];
     const patternNames = new Map(patterns.map((pattern) => [pattern.id, pattern.name]));
 
-    return activities.map((activity) => ({
-      ...activity,
-      target: patternNames.get(activity.targetId) ?? activity.targetId,
-    }));
+    return activities.map((activity) => {
+      const metadata =
+        activity.metadata &&
+        typeof activity.metadata === 'object' &&
+        !Array.isArray(activity.metadata)
+          ? (activity.metadata as Record<string, unknown>)
+          : {};
+      const targetName =
+        (typeof metadata.targetName === 'string' && metadata.targetName) ||
+        patternNames.get(activity.targetId) ||
+        activity.targetId;
+      return {
+        ...activity,
+        target: targetName,
+        actorName: activity.user.name,
+        actorEmail: activity.user.email,
+      };
+    });
   }
 }

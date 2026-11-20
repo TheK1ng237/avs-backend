@@ -24,14 +24,14 @@ export interface UpdateSettingsDto {
   emailNewsletter?: boolean;
   pushBrowser?: boolean;
   pushValidations?: boolean;
-  
+
   // Privacy settings
   profilePublic?: boolean;
   showEmail?: boolean;
   showLocation?: boolean;
   allowIndexing?: boolean;
   shareAnalytics?: boolean;
-  
+
   // 2FA settings
   twoFAEnabled?: boolean;
 }
@@ -168,7 +168,8 @@ export class UserService {
     });
 
     const patternsDiff = patternsThisMonth - patternsLastMonth;
-    const patternsTrend = patternsDiff >= 0 ? `+${patternsDiff} ce mois` : `${patternsDiff} ce mois`;
+    const patternsTrend =
+      patternsDiff >= 0 ? `+${patternsDiff} ce mois` : `${patternsDiff} ce mois`;
 
     // Downloads trend (using activity data)
     const downloadsThisMonth = await this.db.activity.count({
@@ -187,9 +188,10 @@ export class UserService {
       },
     });
 
-    const downloadsTrend = downloadsLastMonth > 0
-      ? `${Math.round(((downloadsThisMonth - downloadsLastMonth) / downloadsLastMonth) * 100)}% vs mois dernier`
-      : '+0% vs mois dernier';
+    const downloadsTrend =
+      downloadsLastMonth > 0
+        ? `${Math.round(((downloadsThisMonth - downloadsLastMonth) / downloadsLastMonth) * 100)}% vs mois dernier`
+        : '+0% vs mois dernier';
 
     // Favorites trend
     const favoritesThisMonth = await this.db.activity.count({
@@ -209,7 +211,8 @@ export class UserService {
     });
 
     const favoritesDiff = favoritesThisMonth - favoritesLastMonth;
-    const favoritesTrend = favoritesDiff >= 0 ? `+${favoritesDiff} nouveaux` : `${favoritesDiff} nouveaux`;
+    const favoritesTrend =
+      favoritesDiff >= 0 ? `+${favoritesDiff} nouveaux` : `${favoritesDiff} nouveaux`;
 
     return {
       patternsCreated,
@@ -265,7 +268,15 @@ export class UserService {
     });
 
     // Map ActivityAction to frontend type and action label
-    const actionConfig: Record<string, { type: 'comment' | 'download' | 'review' | 'favorite'; label: string }> = {
+    const actionConfig: Record<
+      string,
+      { type: 'comment' | 'download' | 'review' | 'favorite'; label: string }
+    > = {
+      CREATED: { type: 'review', label: 'Création de' },
+      UPDATED: { type: 'review', label: 'Modification de' },
+      PUBLISHED: { type: 'review', label: 'Publication de' },
+      DELETED: { type: 'review', label: 'Suppression de' },
+      AUTHENTICATED: { type: 'review', label: 'Connexion' },
       COMMENTED: { type: 'comment', label: 'Commentaire sur' },
       DOWNLOADED: { type: 'download', label: 'Téléchargement de' },
       REVIEWED: { type: 'review', label: 'Validation approuvée —' },
@@ -276,11 +287,19 @@ export class UserService {
 
     for (const activity of activities) {
       const config = actionConfig[activity.action];
-      if (!config) continue;
-
       // Fetch pattern name if target is a pattern
-      let targetName = activity.targetId;
-      if (activity.targetType === 'pattern' || activity.targetType === 'Pattern') {
+      const metadata =
+        activity.metadata &&
+        typeof activity.metadata === 'object' &&
+        !Array.isArray(activity.metadata)
+          ? (activity.metadata as Record<string, unknown>)
+          : {};
+      let targetName =
+        typeof metadata.targetName === 'string' ? metadata.targetName : activity.targetId;
+      if (
+        activity.targetType.toLocaleLowerCase() === 'pattern' &&
+        targetName === activity.targetId
+      ) {
         const pattern = await this.db.pattern.findUnique({
           where: { id: activity.targetId },
           select: { name: true },
@@ -290,10 +309,10 @@ export class UserService {
 
       result.push({
         id: activity.id,
-        action: config.label,
+        action: config?.label ?? `${activity.action.toLocaleLowerCase()} —`,
         target: targetName,
         timestamp: activity.createdAt.toISOString(),
-        type: config.type,
+        type: config?.type ?? 'review',
       });
     }
 
@@ -309,7 +328,7 @@ export class UserService {
   }
 
   // Admin methods
-  async getAllUsers(search: string, role: string ): Promise<User[]> {
+  async getAllUsers(search: string, role: string): Promise<User[]> {
     const where: any = {};
 
     if (search) {
@@ -358,7 +377,16 @@ export class UserService {
       review: number;
     };
   }> {
-    const [totalUsers, totalPatterns, totalDownloads, totalViews, admins, curators, contributors, verifiedUsers] = await Promise.all([
+    const [
+      totalUsers,
+      totalPatterns,
+      totalDownloads,
+      totalViews,
+      admins,
+      curators,
+      contributors,
+      verifiedUsers,
+    ] = await Promise.all([
       this.db.user.count(),
       this.db.pattern.count(),
       this.db.pattern.aggregate({ _sum: { downloads: true } }),
@@ -427,11 +455,10 @@ export class UserService {
         const totalDownloads = patterns.reduce((sum, p) => sum + (p.downloads || 0), 0);
 
         // Calculate a simple score based on patterns, views, and downloads
-        const score = Math.min(100, Math.round(
-          (totalPatterns * 2) + 
-          (totalViews / 1000) + 
-          (totalDownloads / 100)
-        ));
+        const score = Math.min(
+          100,
+          Math.round(totalPatterns * 2 + totalViews / 1000 + totalDownloads / 100),
+        );
 
         return {
           id: user.id,
@@ -451,7 +478,7 @@ export class UserService {
           joinedYear: user.createdAt.getFullYear(),
           badges: user.verified ? ['Vérifié'] : [],
         };
-      })
+      }),
     );
 
     return contributorsWithStats.sort((a, b) => b.score - a.score);
@@ -542,13 +569,15 @@ export class UserService {
     };
   }
 
-  async getSessions(userId: string): Promise<Array<{
-    id: string;
-    device: string;
-    location: string;
-    lastSeen: string;
-    current: boolean;
-  }>> {
+  async getSessions(userId: string): Promise<
+    Array<{
+      id: string;
+      device: string;
+      location: string;
+      lastSeen: string;
+      current: boolean;
+    }>
+  > {
     let sessions = await this.db.session.findMany({
       where: { userId },
       orderBy: { expires: 'desc' },
@@ -638,7 +667,9 @@ export class UserService {
     return `Expirée il y a ${Math.floor(diffDays / 30)} mois`;
   }
 
-  async setup2FA(userId: string): Promise<{ secret: string; otpauthUrl: string; qrCodeUrl: string }> {
+  async setup2FA(
+    userId: string,
+  ): Promise<{ secret: string; otpauthUrl: string; qrCodeUrl: string }> {
     const user = await this.repository.findById(userId);
     if (!user) throw new Error('User not found');
 
@@ -703,4 +734,3 @@ export class UserService {
     await this.repository.update(userId, { profilePublic: false });
   }
 }
-

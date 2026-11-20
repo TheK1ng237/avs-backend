@@ -81,7 +81,7 @@ export class ActivityService {
   async getGlobalActivity(params?: {
     skip?: number;
     take?: number;
-  }): Promise<Array<Activity & { target?: string }>> {
+  }): Promise<Array<Activity & { target?: string; actorName: string | null; actorEmail: string }>> {
     return this.repository.findGlobal(params);
   }
 }

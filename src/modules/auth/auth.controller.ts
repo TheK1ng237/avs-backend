@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AuthService } from '@/modules/auth/application/auth.service';
 import { ok } from '@/shared/types/api.types';
 import { StatusCodes } from 'http-status-codes';
+import { logPlatformActivity } from '@/modules/activity/log-platform-activity';
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -48,10 +49,15 @@ export class AuthController {
     try {
       const data = RegisterSchema.parse(req.body);
       const result = await this.service.register(data);
+      await logPlatformActivity({
+        userId: result.user.id,
+        action: 'CREATED',
+        targetId: result.user.id,
+        targetType: 'USER',
+        targetName: result.user.name || result.user.email,
+      });
 
-      res
-        .status(StatusCodes.CREATED)
-        .json(ok(result, 'User registered successfully'));
+      res.status(StatusCodes.CREATED).json(ok(result, 'User registered successfully'));
     } catch (err) {
       next(err);
     }
@@ -64,6 +70,13 @@ export class AuthController {
     try {
       const data = LoginSchema.parse(req.body);
       const result = await this.service.login(data);
+      await logPlatformActivity({
+        userId: result.user.id,
+        action: 'AUTHENTICATED',
+        targetId: result.user.id,
+        targetType: 'USER',
+        targetName: result.user.name || result.user.email,
+      });
 
       res.json(ok(result, 'Login successful'));
     } catch (err) {
@@ -149,5 +162,4 @@ export class AuthController {
       next(err);
     }
   };
-
 }
