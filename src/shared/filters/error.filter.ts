@@ -21,7 +21,7 @@ export const errorFilter: ErrorRequestHandler = (err: unknown, req: Request, res
 
   if (err instanceof multer.MulterError) {
     const isSizeLimit = err.code === 'LIMIT_FILE_SIZE';
-    const statusCode = isSizeLimit ? StatusCodes.PAYLOAD_TOO_LARGE : StatusCodes.BAD_REQUEST;
+    const statusCode = isSizeLimit ? StatusCodes.REQUEST_TOO_LONG : StatusCodes.BAD_REQUEST;
     return res.status(statusCode).json({
       success: false,
       message: isSizeLimit ? 'L’image dépasse la taille maximale de 5 Mo.' : 'Fichier envoyé invalide.',
